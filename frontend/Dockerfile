@@ -7,6 +7,10 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci || npm install
 
+# Accept build-time API URL
+ARG VITE_API_URL=https://tumerdetection-1.onrender.com
+ENV VITE_API_URL=$VITE_API_URL
+
 # Copy source files and build production distribution
 COPY . .
 RUN npm run build

@@ -1242,7 +1242,7 @@ const AdminDashboard = () => {
               <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-between">
                 <span className="font-medium text-gray-700">Medical Council Certificate:</span>
                 <a
-                  href={`http://127.0.0.1:8000${selectedDoctorModal.certificate_url}`}
+                  href={selectedDoctorModal.certificate_url.startsWith('http') ? selectedDoctorModal.certificate_url : `${(import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '')}${selectedDoctorModal.certificate_url}`}
                   target="_blank"
                   rel="noreferrer"
                   className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-xs"
