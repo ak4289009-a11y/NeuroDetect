@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .card-simple {
+    @apply bg-white border border-gray-200 rounded-lg p-5 shadow-sm;
+  }
+  
+  .btn-primary {
+    @apply bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2.5 rounded-lg transition-colors shadow-sm;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-4 py-2.5 rounded-lg transition-colors border border-gray-200;
+  }
+
+  .table-academic {
+    @apply w-full text-left text-sm text-gray-700 border-collapse border border-gray-200;
+  }
+
+  .table-academic th {
+    @apply bg-gray-50 font-semibold text-gray-700 border-b border-gray-200 p-3 text-xs uppercase tracking-wider;
+  }
+
+  .table-academic td {
+    @apply border-b border-gray-200 p-3 text-gray-700;
+  }
+}
+
+/* Custom Simple Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f3f4f6;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
