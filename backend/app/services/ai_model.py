@@ -1,6 +1,8 @@
 import os
 import time
 import json
+import gc
+import threading
 import numpy as np
 import cv2
 import joblib
@@ -18,40 +20,70 @@ class DenseNetClassifier:
         self.pytorch_model = None
         self.joblib_model = None
         self.scaler = None
-        self._initialize_model()
+        self._lock = threading.Lock()
+        self.device = torch.device("cpu")
 
-    def _initialize_model(self):
-        """Loads trained DenseNet121 model from HDF5 file or joblib fallback."""
-        h5_path = settings.MODEL_PATH
-        if not os.path.exists(h5_path):
-            h5_path = os.path.join(settings.BASE_DIR, "model", "densenet121_brain_tumor.h5")
+    def _get_pytorch_model(self) -> nn.Module:
+        """
+        Thread-safe singleton lazy loader for DenseNet121 PyTorch neural network.
+        Ensures model weights are loaded into CPU memory ONLY when an MRI scan request is made.
+        """
+        if self.pytorch_model is not None:
+            return self.pytorch_model
 
-        if os.path.exists(h5_path):
-            try:
-                self.pytorch_model = self._load_densenet121_from_h5(h5_path)
-                print(f"[DenseNet121 Engine] Successfully loaded trained DenseNet121 neural network from '{h5_path}'")
-            except Exception as e:
-                print(f"[DenseNet121 Error] Failed to load DenseNet121 model: {e}")
+        with self._lock:
+            if self.pytorch_model is not None:
+                return self.pytorch_model
 
-        # Fallback to joblib model if available
-        candidate_dirs = [
-            settings.BASE_DIR,
-            os.path.dirname(settings.BASE_DIR),
-            settings.MODEL_DIR,
-            os.getcwd()
-        ]
-        
-        for candidate_dir in candidate_dirs:
-            j_path = os.path.join(candidate_dir, "brain_tumor_model.joblib")
-            s_path = os.path.join(candidate_dir, "feature_scaler.joblib")
-            if os.path.exists(j_path) and os.path.exists(s_path):
+            h5_path = settings.MODEL_PATH
+            if not os.path.exists(h5_path):
+                h5_path = os.path.join(settings.BASE_DIR, "model", "densenet121_brain_tumor.h5")
+
+            if os.path.exists(h5_path):
                 try:
-                    self.joblib_model = joblib.load(j_path)
-                    self.scaler = joblib.load(s_path)
-                    print(f"[Backup Model Engine] Loaded fallback joblib model from '{j_path}'")
-                    break
+                    loaded_model = self._load_densenet121_from_h5(h5_path)
+                    loaded_model.to(self.device)
+                    loaded_model.eval()
+                    self.pytorch_model = loaded_model
+                    print(f"[DenseNet121 Engine] Lazy-loaded DenseNet121 model on demand from '{h5_path}' (CPU Mode).")
                 except Exception as e:
-                    print(f"[Backup Model Engine Warning] Failed to load joblib model: {e}")
+                    print(f"[DenseNet121 Error] Failed to load DenseNet121 model on demand: {e}")
+                    self.pytorch_model = None
+
+            return self.pytorch_model
+
+    def _get_joblib_model(self):
+        """
+        Thread-safe lazy loader for secondary fallback RandomForest model & scaler.
+        Loaded ONLY if primary DenseNet121 PyTorch model is unavailable.
+        """
+        if self.joblib_model is not None and self.scaler is not None:
+            return self.joblib_model, self.scaler
+
+        with self._lock:
+            if self.joblib_model is not None and self.scaler is not None:
+                return self.joblib_model, self.scaler
+
+            candidate_dirs = [
+                settings.BASE_DIR,
+                os.path.dirname(settings.BASE_DIR),
+                settings.MODEL_DIR,
+                os.getcwd()
+            ]
+
+            for candidate_dir in candidate_dirs:
+                j_path = os.path.join(candidate_dir, "brain_tumor_model.joblib")
+                s_path = os.path.join(candidate_dir, "feature_scaler.joblib")
+                if os.path.exists(j_path) and os.path.exists(s_path):
+                    try:
+                        self.joblib_model = joblib.load(j_path)
+                        self.scaler = joblib.load(s_path)
+                        print(f"[Backup Model Engine] Lazy-loaded fallback joblib model on demand from '{j_path}'.")
+                        break
+                    except Exception as e:
+                        print(f"[Backup Model Engine Warning] Failed lazy-loading joblib model: {e}")
+
+            return self.joblib_model, self.scaler
 
     def _load_densenet121_from_h5(self, h5_path: str) -> nn.Module:
         """
@@ -185,21 +217,22 @@ class DenseNetClassifier:
         std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
         img_standardized = (img_normalized - mean) / std
         
-        # Convert to NCHW PyTorch tensor
-        input_tensor = torch.from_numpy(np.transpose(img_standardized, (2, 0, 1))).unsqueeze(0).float()
+        # Convert to NCHW PyTorch tensor on CPU
+        input_tensor = torch.from_numpy(np.transpose(img_standardized, (2, 0, 1))).unsqueeze(0).float().to(self.device)
         
         return input_tensor, img_bgr
 
-    def generate_gradcam_heatmap(self, img_bgr: np.ndarray, tumor_class_idx: int, output_filename: str, input_tensor: torch.Tensor = None) -> str:
+    def generate_gradcam_heatmap(self, img_bgr: np.ndarray, tumor_class_idx: int, output_filename: str, input_tensor: torch.Tensor = None, model: nn.Module = None) -> str:
         """
         Generates TRUE Grad-CAM activation heatmap overlay by computing backpropagation gradients 
         of the predicted class score with respect to target feature block 'features.denseblock4'.
+        Ensures hooks and intermediate gradient tensors are cleanly removed/garbage-collected after execution.
         """
         img_resized = cv2.resize(img_bgr, settings.IMAGE_SIZE)
 
-        if self.pytorch_model is not None and input_tensor is not None:
+        if model is not None and input_tensor is not None:
             # TRUE Grad-CAM implementation using neural network backpropagation gradients
-            target_layer = self.pytorch_model.features.denseblock4
+            target_layer = model.features.denseblock4
             activations = []
             gradients = []
 
@@ -215,8 +248,8 @@ class DenseNetClassifier:
             # Requires gradient tracking on input tensor
             input_tensor_grad = input_tensor.clone().detach().requires_grad_(True)
             
-            self.pytorch_model.zero_grad()
-            logits = self.pytorch_model(input_tensor_grad)
+            model.zero_grad()
+            logits = model(input_tensor_grad)
             score = logits[0, tumor_class_idx]
             
             # Backpropagate target class score to target conv layer
@@ -238,6 +271,10 @@ class DenseNetClassifier:
 
             # Apply ReLU to retain only positive activation contributions
             cam_np = F.relu(cam).numpy()
+
+            # Clean memory of intermediate tensors
+            del activations, gradients, input_tensor_grad, score, logits, act, grad, weights, cam
+            gc.collect()
 
             # Normalize activation map to [0, 1]
             if np.max(cam_np) > np.min(cam_np):
@@ -273,54 +310,59 @@ class DenseNetClassifier:
     def predict(self, image_path: str, filename: str) -> tuple:
         """
         Runs neural network inference on MRI image using DenseNet121 engine and generates TRUE Grad-CAM heatmap.
+        Lazy-loads model weights on first call.
         Returns (predicted_class, confidence_score, heatmap_relative_url).
         """
         input_tensor, img_bgr = self.preprocess_image(image_path)
+        py_model = self._get_pytorch_model()
         
-        if self.pytorch_model is not None:
+        if py_model is not None:
             # 1. Primary Neural Network Inference (DenseNet121)
             with torch.no_grad():
-                logits = self.pytorch_model(input_tensor)
+                logits = py_model(input_tensor)
                 probs = F.softmax(logits, dim=1)[0].numpy()
                 class_idx = int(np.argmax(probs))
                 confidence = float(probs[class_idx]) * 100.0
                 print(f"[DenseNet121 Inference] Class: {self.class_names[class_idx]} ({confidence:.2f}%)")
-        elif self.joblib_model is not None and self.scaler is not None:
-            # 2. Fallback RandomForest Inference
-            feats = self.extract_features(img_bgr)
-            feats_scaled = self.scaler.transform(feats)
-            class_idx = int(self.joblib_model.predict(feats_scaled)[0])
-            
-            if hasattr(self.joblib_model, "predict_proba"):
-                probs = self.joblib_model.predict_proba(feats_scaled)[0]
-                confidence = float(probs[class_idx]) * 100.0
-            else:
-                confidence = 96.5
         else:
-            # 3. Deterministic Heuristic Fallback
-            gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-            std_dev = np.std(gray)
-            mean_val = np.mean(gray)
-            
-            if std_dev > 65 and mean_val > 70:
-                class_idx = 0 # Glioma
-                confidence = 94.8
-            elif std_dev > 55:
-                class_idx = 1 # Meningioma
-                confidence = 92.3
-            elif mean_val > 90:
-                class_idx = 3 # Pituitary
-                confidence = 96.1
+            j_model, scaler = self._get_joblib_model()
+            if j_model is not None and scaler is not None:
+                # 2. Fallback RandomForest Inference
+                feats = self.extract_features(img_bgr)
+                feats_scaled = scaler.transform(feats)
+                class_idx = int(j_model.predict(feats_scaled)[0])
+                
+                if hasattr(j_model, "predict_proba"):
+                    probs = j_model.predict_proba(feats_scaled)[0]
+                    confidence = float(probs[class_idx]) * 100.0
+                else:
+                    confidence = 96.5
             else:
-                class_idx = 2 # No Tumor
-                confidence = 98.4
+                # 3. Deterministic Heuristic Fallback
+                gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+                std_dev = np.std(gray)
+                mean_val = np.mean(gray)
+                
+                if std_dev > 65 and mean_val > 70:
+                    class_idx = 0 # Glioma
+                    confidence = 94.8
+                elif std_dev > 55:
+                    class_idx = 1 # Meningioma
+                    confidence = 92.3
+                elif mean_val > 90:
+                    class_idx = 3 # Pituitary
+                    confidence = 96.1
+                else:
+                    class_idx = 2 # No Tumor
+                    confidence = 98.4
 
         predicted_label = self.class_names[class_idx]
         
         # Generate TRUE Grad-CAM activation heatmap using DenseNet121 backpropagation gradients
-        heatmap_url = self.generate_gradcam_heatmap(img_bgr, class_idx, filename, input_tensor=input_tensor)
+        heatmap_url = self.generate_gradcam_heatmap(img_bgr, class_idx, filename, input_tensor=input_tensor, model=py_model)
         
         return predicted_label, round(confidence, 2), heatmap_url
 
 
 ai_classifier = DenseNetClassifier()
+
