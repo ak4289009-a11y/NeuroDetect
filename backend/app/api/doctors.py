@@ -214,6 +214,14 @@ def review_scan_report(
         details=f"Reviewed Report #{ai_report.id} -> Status: {review_in.status}"
     )
     db.add(audit)
+    # Clear cached PDF report so updated review is reflected in next download
+    pdf_cache_file = os.path.join(settings.REPORT_DIR, f"NeuroDetect_Report_{ai_report.id}.pdf")
+    if os.path.exists(pdf_cache_file):
+        try:
+            os.remove(pdf_cache_file)
+        except Exception:
+            pass
+
     db.commit()
     db.refresh(doctor_review)
 

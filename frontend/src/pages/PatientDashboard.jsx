@@ -60,7 +60,15 @@ const PatientDashboard = () => {
     loadDashboardData();
     loadMyMessages();
     loadMyAppointments();
-  }, [currentTab, selectedCityFilter]);
+  }, []);
+
+  useEffect(() => {
+    if (selectedCityFilter !== 'All') {
+      doctorAPI.getPublicDoctors(selectedCityFilter)
+        .then(res => setPublicDoctorsList(res.data || []))
+        .catch(err => console.error("Error fetching doctors by city:", err));
+    }
+  }, [selectedCityFilter]);
 
   const loadDashboardData = async () => {
     setLoadingStatus(true);
@@ -76,7 +84,7 @@ const PatientDashboard = () => {
         contentAPI.getDiets(),
         contentAPI.getVideos(),
         contentAPI.getFAQs(),
-        doctorAPI.getPublicDoctors(selectedCityFilter),
+        doctorAPI.getPublicDoctors('All'),
         doctorAPI.getLocations()
       ]);
 

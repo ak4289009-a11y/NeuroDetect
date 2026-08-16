@@ -81,7 +81,7 @@ const DoctorDashboard = () => {
 
   useEffect(() => {
     fetchDoctorData();
-  }, [currentTab]);
+  }, []);
 
   const fetchDoctorData = async () => {
     setLoading(true);

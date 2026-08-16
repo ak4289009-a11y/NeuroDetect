@@ -274,7 +274,6 @@ class DenseNetClassifier:
 
             # Clean memory of intermediate tensors
             del activations, gradients, input_tensor_grad, score, logits, act, grad, weights, cam
-            gc.collect()
 
             # Normalize activation map to [0, 1]
             if np.max(cam_np) > np.min(cam_np):

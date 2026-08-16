@@ -106,7 +106,7 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     fetchAdminData();
-  }, [currentTab]);
+  }, []);
 
   const fetchAdminData = async () => {
     setLoading(true);

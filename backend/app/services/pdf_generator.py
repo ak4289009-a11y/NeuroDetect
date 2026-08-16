@@ -20,8 +20,11 @@ def generate_pdf_report(
     Generates a state-of-the-art, highly attractive healthcare PDF diagnostic report.
     Returns relative filepath for download.
     """
-    pdf_filename = f"NeuroDetect_Report_{report_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    pdf_filename = f"NeuroDetect_Report_{report_id}.pdf"
     pdf_save_path = os.path.join(settings.REPORT_DIR, pdf_filename)
+    
+    if os.path.exists(pdf_save_path):
+        return f"/reports/{pdf_filename}"
     
     doc = SimpleDocTemplate(
         pdf_save_path,
