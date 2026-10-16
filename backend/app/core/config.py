@@ -43,22 +43,21 @@ class Settings(BaseSettings):
                 print("[Deployment Notice] DATABASE_URL not set or points to SQLite. Using persistent SQLite database instance.")
             return f"sqlite:///{self.DEFAULT_DB_PATH}"
     
-    # SMTP Email Configuration
-    SMTP_SERVER: str = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    # SMTP & Brevo Transactional Email Configuration
+    SMTP_SERVER: str = os.getenv("SMTP_SERVER", "smtp-relay.brevo.com")
     SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
-    SMTP_USER: str = os.getenv("SMTP_USER", "notifications@neurodetect.ai")
-    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "mockpassword")
-    EMAIL_FROM: str = os.getenv("EMAIL_FROM", "noreply@neurodetect.ai")
+    SMTP_USER: str = os.getenv("SMTP_USER", os.getenv("BREVO_SMTP_LOGIN", "bdb1f8001@smtp-brevo.com"))
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", os.getenv("BREVO_SMTP_PASSWORD", ""))
+    EMAIL_FROM: str = os.getenv("EMAIL_FROM", os.getenv("BREVO_SENDER_EMAIL", "neyro390@gmail.com"))
 
-    # Brevo Transactional SMTP & API Configuration (Listing 10.2 & Listing B.3)
     BREVO_SMTP_SERVER: str = os.getenv("BREVO_SMTP_SERVER", "smtp-relay.brevo.com")
     BREVO_SMTP_PORT: int = int(os.getenv("BREVO_SMTP_PORT", "587"))
-    BREVO_SMTP_LOGIN: str = os.getenv("BREVO_SMTP_LOGIN", "")
-    BREVO_SMTP_PASSWORD: str = os.getenv("BREVO_SMTP_PASSWORD", "")
-    BREVO_SMTP_USER: str = os.getenv("BREVO_SMTP_USER", "")
-    BREVO_SMTP_KEY: str = os.getenv("BREVO_SMTP_KEY", "")
+    BREVO_SMTP_LOGIN: str = os.getenv("BREVO_SMTP_LOGIN", os.getenv("SMTP_USER", "bdb1f8001@smtp-brevo.com"))
+    BREVO_SMTP_PASSWORD: str = os.getenv("BREVO_SMTP_PASSWORD", os.getenv("SMTP_PASSWORD", ""))
+    BREVO_SMTP_USER: str = os.getenv("BREVO_SMTP_USER", os.getenv("SMTP_USER", "bdb1f8001@smtp-brevo.com"))
+    BREVO_SMTP_KEY: str = os.getenv("BREVO_SMTP_KEY", os.getenv("SMTP_PASSWORD", ""))
     BREVO_API_KEY: str = os.getenv("BREVO_API_KEY", "")
-    BREVO_SENDER_EMAIL: str = os.getenv("BREVO_SENDER_EMAIL", "noreply@neurodetect.hospital.org")
+    BREVO_SENDER_EMAIL: str = os.getenv("BREVO_SENDER_EMAIL", os.getenv("EMAIL_FROM", "neyro390@gmail.com"))
     BREVO_SENDER_NAME: str = os.getenv("BREVO_SENDER_NAME", "NeuroDetect Medical Portal")
 
     # Supabase Private Storage Configuration

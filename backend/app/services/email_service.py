@@ -67,8 +67,9 @@ def send_brevo_smtp_email(to_email: str, subject: str, body_html: str) -> bool:
     """
     Delivers transactional email via Brevo's authenticated SMTP relay (smtp-relay.brevo.com:587).
     """
-    smtp_key = settings.BREVO_SMTP_KEY or settings.BREVO_API_KEY or settings.BREVO_SMTP_PASSWORD
-    smtp_user = settings.BREVO_SMTP_USER or settings.BREVO_SMTP_LOGIN or settings.BREVO_SENDER_EMAIL
+    smtp_key = settings.BREVO_SMTP_KEY or settings.BREVO_SMTP_PASSWORD or settings.SMTP_PASSWORD
+    smtp_user = settings.BREVO_SMTP_USER or settings.BREVO_SMTP_LOGIN or settings.SMTP_USER
+    sender_email = settings.BREVO_SENDER_EMAIL or settings.EMAIL_FROM or "neyro390@gmail.com"
     if not smtp_key or not smtp_user or smtp_key.startswith("xkeysib-your_brevo"):
         return False
     if not is_valid_email_address(to_email):
@@ -77,15 +78,18 @@ def send_brevo_smtp_email(to_email: str, subject: str, body_html: str) -> bool:
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
-        msg["From"] = f"{settings.BREVO_SENDER_NAME} <{settings.BREVO_SENDER_EMAIL}>"
+        msg["From"] = f"{settings.BREVO_SENDER_NAME} <{sender_email}>"
         msg["To"] = to_email
         html_part = MIMEText(body_html, "html")
         msg.attach(html_part)
-        with smtplib.SMTP(settings.BREVO_SMTP_SERVER, settings.BREVO_SMTP_PORT, timeout=12) as server:
+        server_host = settings.BREVO_SMTP_SERVER or settings.SMTP_SERVER or "smtp-relay.brevo.com"
+        server_port = settings.BREVO_SMTP_PORT or settings.SMTP_PORT or 587
+        with smtplib.SMTP(server_host, server_port, timeout=12) as server:
             server.ehlo()
             server.starttls()
+            server.ehlo()
             server.login(smtp_user, smtp_key)
-            server.sendmail(settings.BREVO_SENDER_EMAIL, [to_email], msg.as_string())
+            server.sendmail(sender_email, [to_email], msg.as_string())
         print(f"[Brevo SMTP Success] Dispatched email to {to_email} | Subject: '{subject}'")
         return True
     except Exception as exc:

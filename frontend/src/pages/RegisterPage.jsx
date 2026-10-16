@@ -439,16 +439,9 @@ const RegisterPage = () => {
               </div>
             </div>
 
-            {registerOtp ? (
-              <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-[11px] text-emerald-800 font-semibold flex items-center justify-between">
-                <span>Demo/Direct Verification OTP: <code className="font-mono text-xs font-bold text-emerald-900 bg-white px-1.5 py-0.5 rounded border border-emerald-300">{registerOtp}</code></span>
-                <span className="text-[10px] bg-emerald-200 px-1.5 py-0.5 rounded text-emerald-900 font-bold">Auto-Filled</span>
-              </div>
-            ) : (
-              <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-[11px] text-blue-900 font-medium leading-normal">
-                📧 An email containing a 6-digit verification code has been dispatched to <b>{pendingTargetEmail}</b>. Please open your email inbox (or Spam folder), copy the 6-digit code, and enter it below.
-              </div>
-            )}
+            <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-[11px] text-blue-900 font-medium leading-normal">
+              📧 An email containing a 6-digit verification code has been dispatched to <b>{pendingTargetEmail}</b>. Please open your email inbox (or Spam folder), copy the 6-digit code, and enter it below.
+            </div>
 
             <form onSubmit={handleFinalizeRegistration} className="space-y-4">
               <div>

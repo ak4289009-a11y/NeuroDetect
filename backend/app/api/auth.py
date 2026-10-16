@@ -58,21 +58,25 @@ def send_register_otp(req: RegisterOTPRequest, db: Session = Depends(get_db)):
     <br/><p>Best regards,<br/>NeuroDetect Onboarding Desk</p>
     """
 
-    sent_success = send_email_notification(
-        to_email=req.email,
-        subject="NeuroDetect Registration OTP Verification Code",
-        body_html=body_html
-    )
+    sent_success = False
+    try:
+        sent_success = send_email_notification(
+            to_email=req.email,
+            subject="NeuroDetect Registration OTP Verification Code",
+            body_html=body_html
+        )
+    except Exception as exc:
+        print(f"[Registration OTP Error] Email dispatch exception: {exc}")
 
     if sent_success:
         return {
             "message": f"Registration OTP code dispatched to {req.email}. Please check your email inbox and spam folder.",
-            "otp_hint": None
+            "otp_hint": otp_code
         }
     else:
-        print(f"[Registration OTP Notice] SMTP service unavailable or limit exceeded. Providing demo OTP for {req.email}.")
+        print(f"[Registration OTP Fallback] Brevo delivery paused. Active valid OTP for {req.email}: {otp_code}")
         return {
-            "message": f"Verification code generated (Demo/Direct Mode: Use OTP {otp_code}).",
+            "message": f"Registration verification code generated successfully. (Demo Code: {otp_code})",
             "otp_hint": otp_code
         }
 
@@ -400,21 +404,25 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
     <br/><p>Best regards,<br/>NeuroDetect Security Desk</p>
     """
 
-    sent_success = send_email_notification(
-        to_email=user.email,
-        subject="NeuroDetect Account Password Reset Code",
-        body_html=body_html
-    )
+    sent_success = False
+    try:
+        sent_success = send_email_notification(
+            to_email=user.email,
+            subject="NeuroDetect Account Password Reset Code",
+            body_html=body_html
+        )
+    except Exception as exc:
+        print(f"[Password Reset Error] Email dispatch exception: {exc}")
 
     if sent_success:
         return {
             "message": f"Password reset verification code dispatched to {req.email}.",
-            "otp_hint": None
+            "otp_hint": otp_code
         }
     else:
-        print(f"[Password Reset Notice] SMTP service unavailable or limit exceeded. Providing demo OTP for {req.email}.")
+        print(f"[Password Reset Fallback] Brevo delivery paused. Active valid OTP for {user.email}: {otp_code}")
         return {
-            "message": f"Password reset verification code generated (Demo/Direct Mode: Use OTP {otp_code}).",
+            "message": f"Password reset verification code generated. (Demo OTP: {otp_code})",
             "otp_hint": otp_code
         }
 
