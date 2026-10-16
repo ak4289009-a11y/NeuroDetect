@@ -66,43 +66,54 @@ def send_brevo_api_email(to_email: str, subject: str, body_html: str) -> bool:
 def send_brevo_smtp_email(to_email: str, subject: str, body_html: str) -> bool:
     """
     Delivers transactional email via Brevo's authenticated SMTP relay (smtp-relay.brevo.com).
-    Tries configured port (default 587) and automatically fails over to alternative port 2525.
+    Tries configured port (587), alternative port (2525), and SSL port (465) for maximum cloud hosting resilience.
     """
-    smtp_key = settings.BREVO_SMTP_KEY or settings.BREVO_SMTP_PASSWORD or settings.SMTP_PASSWORD
-    smtp_user = settings.BREVO_SMTP_USER or settings.BREVO_SMTP_LOGIN or settings.SMTP_USER
-    sender_email = settings.BREVO_SENDER_EMAIL or settings.EMAIL_FROM or "neyro390@gmail.com"
+    smtp_key = (settings.BREVO_SMTP_KEY or settings.BREVO_SMTP_PASSWORD or settings.SMTP_PASSWORD or "").strip()
+    smtp_user = (settings.BREVO_SMTP_USER or settings.BREVO_SMTP_LOGIN or settings.SMTP_USER or "").strip()
+    sender_email = (settings.BREVO_SENDER_EMAIL or settings.EMAIL_FROM or "neyro390@gmail.com").strip()
+    sender_name = (settings.BREVO_SENDER_NAME or "NeuroDetect Medical Portal").strip()
+    server_host = (settings.BREVO_SMTP_SERVER or settings.SMTP_SERVER or "smtp-relay.brevo.com").strip()
+
     if not smtp_key or not smtp_user or smtp_key.startswith("xkeysib-your_brevo"):
+        print("[Brevo SMTP Error] No valid SMTP credentials found in environment variables.")
         return False
     if not is_valid_email_address(to_email):
-        print(f"[Brevo SMTP Error] Invalid recipient email: '{to_email}'")
+        print(f"[Brevo SMTP Error] Invalid recipient email address: '{to_email}'")
         return False
+
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
-        msg["From"] = f"{settings.BREVO_SENDER_NAME} <{sender_email}>"
-        msg["To"] = to_email
+        msg["From"] = f"{sender_name} <{sender_email}>"
+        msg["To"] = to_email.strip()
         html_part = MIMEText(body_html, "html")
         msg.attach(html_part)
-        server_host = settings.BREVO_SMTP_SERVER or settings.SMTP_SERVER or "smtp-relay.brevo.com"
-        configured_port = int(settings.BREVO_SMTP_PORT or settings.SMTP_PORT or 587)
-        ports_to_try = [configured_port]
-        if 2525 not in ports_to_try:
-            ports_to_try.append(2525)
 
-        for port in ports_to_try:
+        # 1. Try STARTTLS on Port 587 and Port 2525
+        for port in [587, 2525]:
             try:
-                with smtplib.SMTP(server_host, port, timeout=12) as server:
+                with smtplib.SMTP(server_host, port, timeout=10) as server:
                     server.ehlo()
                     server.starttls()
                     server.ehlo()
                     server.login(smtp_user, smtp_key)
-                    server.sendmail(sender_email, [to_email], msg.as_string())
-                print(f"[Brevo SMTP Success] Dispatched email to {to_email} via {server_host}:{port} | Subject: '{subject}'")
+                    server.sendmail(sender_email, [to_email.strip()], msg.as_string())
+                print(f"[Brevo SMTP Success] Dispatched email to {to_email} via {server_host}:{port} (STARTTLS) | Subject: '{subject}'")
                 return True
             except Exception as port_exc:
                 print(f"[Brevo SMTP Notice] Attempt on {server_host}:{port} failed: {type(port_exc).__name__} - {port_exc}")
-                if port == ports_to_try[-1]:
-                    raise port_exc
+
+        # 2. Try SSL on Port 465 (Essential fallback for cloud platforms like Render where 587/2525 can be restricted)
+        try:
+            with smtplib.SMTP_SSL(server_host, 465, timeout=10) as server:
+                server.ehlo()
+                server.login(smtp_user, smtp_key)
+                server.sendmail(sender_email, [to_email.strip()], msg.as_string())
+            print(f"[Brevo SMTP Success] Dispatched email to {to_email} via {server_host}:465 (SSL) | Subject: '{subject}'")
+            return True
+        except Exception as ssl_exc:
+            print(f"[Brevo SMTP Notice] Attempt on {server_host}:465 (SSL) failed: {type(ssl_exc).__name__} - {ssl_exc}")
+
         return False
     except Exception as exc:
         print(f"[Brevo SMTP Error] Dispatch failed to {to_email}: {type(exc).__name__} - {str(exc)}")
