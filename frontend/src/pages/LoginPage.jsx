@@ -275,7 +275,11 @@ const LoginPage = () => {
                 </button>
               </form>
             ) : (
-              <form onSubmit={handleResetPasswordSubmit} className="space-y-3" autoComplete="off">
+              <div className="space-y-3">
+                <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-[11px] text-amber-900 leading-normal">
+                  ⚠️ <b>Check your Spam / Junk folder:</b> Brevo transactional emails often get filtered into your Gmail <b>Spam</b> folder or <b>Promotions</b> tab.
+                </div>
+                <form onSubmit={handleResetPasswordSubmit} className="space-y-3" autoComplete="off">
                 <div>
                   <label className="block font-semibold text-gray-700 mb-1">6-Digit OTP Verification Code</label>
                   <input
@@ -366,6 +370,7 @@ const LoginPage = () => {
                   </button>
                 </div>
               </form>
+              </div>
             )}
 
           </div>
