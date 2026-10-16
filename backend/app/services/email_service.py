@@ -112,7 +112,7 @@ def send_brevo_smtp_email(to_email: str, subject: str, body_html: str) -> bool:
         # 1. Try STARTTLS on Port 587 and Port 2525
         for port in [587, 2525]:
             try:
-                with smtplib.SMTP(server_host, port, timeout=10) as server:
+                with smtplib.SMTP(server_host, port, timeout=4.0) as server:
                     server.ehlo()
                     server.starttls()
                     server.ehlo()
@@ -129,7 +129,7 @@ def send_brevo_smtp_email(to_email: str, subject: str, body_html: str) -> bool:
 
         # 2. Try SSL on Port 465 (Essential fallback for cloud platforms like Render where 587/2525 can be restricted)
         try:
-            with smtplib.SMTP_SSL(server_host, 465, timeout=10) as server:
+            with smtplib.SMTP_SSL(server_host, 465, timeout=4.0) as server:
                 server.ehlo()
                 server.login(smtp_user, smtp_key)
                 server.sendmail(sender_email, [to_email.strip()], msg.as_string())

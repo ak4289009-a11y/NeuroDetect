@@ -1,6 +1,6 @@
 from typing import List, Optional
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.api.auth import require_role
@@ -14,8 +14,10 @@ from app.core.config import settings
 from app.services.email_service import send_email_notification
 
 @router.post("/", response_model=MessageOut)
+@router.post("", response_model=MessageOut)
 def submit_contact_message(
     msg_in: MessageCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     """Submits a contact form message and dispatches email notification to NeuroDetect inquiry desk."""
@@ -82,47 +84,40 @@ def submit_contact_message(
     </html>
     """
 
-    try:
-        sent = send_email_notification(
-            to_email=recipient_email,
-            subject=f"[NeuroDetect Inquiry] {subject_text} - From {msg_in.sender_name}",
-            body_html=body_html
-        )
-        if sent:
-            print(f"[Contact Email] Successfully forwarded message from {msg_in.sender_email} to NeuroDetect ({recipient_email})")
-        else:
-            print(f"[Contact Email Notice] Could not dispatch email to {recipient_email}. Message is safely persisted in database.")
-    except Exception as exc:
-        print(f"[Contact Email Error] Failed to deliver inquiry to {recipient_email}: {exc}")
+    # Schedule email notifications in background so HTTP response returns instantly (<50ms)
+    background_tasks.add_task(
+        send_email_notification,
+        to_email=recipient_email,
+        subject=f"[NeuroDetect Inquiry] {subject_text} - From {msg_in.sender_name}",
+        body_html=body_html
+    )
 
-    # Send auto-acknowledgment receipt to the sender
-    try:
-        ack_html = f"""
-        <!DOCTYPE html>
-        <html>
-        <head><meta charset="utf-8"></head>
-        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; padding: 24px;">
-          <div style="max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; padding: 24px;">
-            <h2 style="color: #1e3a8a; margin-top: 0;">Thank you for contacting NeuroDetect</h2>
-            <p>Dear {msg_in.sender_name},</p>
-            <p>We have successfully received your inquiry regarding <strong>"{subject_text}"</strong>.</p>
-            <p>Our clinical review team and technical support desk will examine your message and respond to you as soon as possible.</p>
-            <div style="background: #f1f5f9; padding: 12px 16px; border-radius: 6px; font-size: 13px; color: #475569; margin: 16px 0;">
-              <strong>Your Inquiry Summary:</strong><br/>
-              <em>"{msg_in.message[:250]}{'...' if len(msg_in.message) > 250 else ''}"</em>
-            </div>
-            <p style="font-size: 13px; color: #64748b;">Best regards,<br/><strong>NeuroDetect Medical Assistance Team</strong></p>
-          </div>
-        </body>
-        </html>
-        """
-        send_email_notification(
-            to_email=msg_in.sender_email,
-            subject=f"We have received your message: {subject_text} - NeuroDetect Support",
-            body_html=ack_html
-        )
-    except Exception as ack_exc:
-        print(f"[Contact Email Ack Error] {ack_exc}")
+    ack_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; padding: 24px;">
+      <div style="max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; padding: 24px;">
+        <h2 style="color: #1e3a8a; margin-top: 0;">Thank you for contacting NeuroDetect</h2>
+        <p>Dear {msg_in.sender_name},</p>
+        <p>We have successfully received your inquiry regarding <strong>"{subject_text}"</strong>.</p>
+        <p>Our clinical review team and technical support desk will examine your message and respond to you as soon as possible.</p>
+        <div style="background: #f1f5f9; padding: 12px 16px; border-radius: 6px; font-size: 13px; color: #475569; margin: 16px 0;">
+          <strong>Your Inquiry Summary:</strong><br/>
+          <em>"{msg_in.message[:250]}{'...' if len(msg_in.message) > 250 else ''}"</em>
+        </div>
+        <p style="font-size: 13px; color: #64748b;">Best regards,<br/><strong>NeuroDetect Medical Assistance Team</strong></p>
+      </div>
+    </body>
+    </html>
+    """
+
+    background_tasks.add_task(
+        send_email_notification,
+        to_email=msg_in.sender_email,
+        subject=f"We have received your message: {subject_text} - NeuroDetect Support",
+        body_html=ack_html
+    )
 
     return msg
 
