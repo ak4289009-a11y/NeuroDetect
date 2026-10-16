@@ -107,6 +107,7 @@ class Token(BaseModel):
     token_type: str
     role: str
     user_id: int
+    name: Optional[str] = None
 
 class TokenData(BaseModel):
     user_id: Optional[int] = None

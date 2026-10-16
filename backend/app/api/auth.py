@@ -10,7 +10,7 @@ from app.core.security import verify_password, get_password_hash, create_access_
 from app.core.config import settings
 from app.services.email_service import send_email_notification
 from datetime import datetime, timedelta
-from app.models.models import User, Patient, Doctor, UserRole, DoctorStatus, DoctorApproval, AuditLog, Notification, RegistrationOTP
+from app.models.models import User, Patient, Doctor, UserRole, DoctorStatus, DoctorApproval, AuditLog, Notification, RegistrationOTP, PasswordResetOTP
 from app.schemas.schemas import Token, LoginRequest, PatientRegister, UserOut, RegisterOTPRequest
 from fastapi.security import OAuth2PasswordBearer
 
@@ -306,7 +306,7 @@ def login(login_req: LoginRequest, db: Session = Depends(get_db)):
     if not user or not verify_password(login_req.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password.")
         
-    if user.role != login_req.role:
+    if login_req.role and user.role != login_req.role:
         raise HTTPException(
             status_code=403, 
             detail=f"Selected role '{login_req.role}' does not match account privileges."
@@ -347,33 +347,41 @@ def get_current_user_profile(current_user: User = Depends(get_current_user)):
     """Returns profile info for currently logged-in user."""
     return current_user
 
-import time
 import random
 import string
 from sqlalchemy import func
 from app.schemas.schemas import ForgotPasswordRequest, ResetPasswordRequest
 from app.services.email_service import send_email_notification
 
-# Store reset OTP codes in memory with timestamp expiration { email: { "code": string, "expires_at": float } }
-RESET_OTP_STORE = {}
-
 @router.post("/forgot-password")
 def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
     """
     Generates a 6-digit OTP code and transmits password reset instructions to user's email address.
-    Falls back to providing OTP hint if SMTP server is unavailable.
+    Saves OTP persistently in the database with a 15-minute expiration.
     """
     clean_email = (req.email or "").strip().lower()
     user = db.query(User).filter(func.lower(User.email) == clean_email).first()
     if not user:
         return {"message": f"If an account with {req.email} exists, a password reset code has been dispatched."}
 
-    # Generate 6-digit numeric OTP code valid for 10 minutes (600s)
+    # Generate 6-digit numeric OTP code valid for 15 minutes
     otp_code = "".join(random.choices(string.digits, k=6))
-    RESET_OTP_STORE[clean_email] = {
-        "code": otp_code,
-        "expires_at": time.time() + 600
-    }
+    expiry_time = datetime.utcnow() + timedelta(minutes=15)
+
+    existing_otp = db.query(PasswordResetOTP).filter(func.lower(PasswordResetOTP.email) == clean_email).first()
+    if existing_otp:
+        existing_otp.otp_code = otp_code
+        existing_otp.expires_at = expiry_time
+        existing_otp.created_at = datetime.utcnow()
+    else:
+        new_otp = PasswordResetOTP(
+            email=clean_email,
+            otp_code=otp_code,
+            expires_at=expiry_time
+        )
+        db.add(new_otp)
+
+    db.commit()
 
     user_name = "User"
     if user.patient_profile:
@@ -386,7 +394,7 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
     <p>Dear {user_name},</p>
     <p>We received a request to reset your NeuroDetect account password.</p>
     <p style="font-size:18px; font-weight:bold; color:#2563eb;">Your Password Reset OTP: <span style="background:#e0e7ff; padding:4px 8px; border-radius:4px;">{otp_code}</span></p>
-    <p>Enter this 6-digit OTP code on the reset password screen to create a new password. Code expires in 10 minutes.</p>
+    <p>Enter this 6-digit OTP code on the reset password screen to create a new password. Code expires in 15 minutes.</p>
     <br/><p>If you did not request a password reset, please ignore this email.</p>
     <br/><p>Best regards,<br/>NeuroDetect Security Desk</p>
     """
@@ -411,33 +419,34 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
 @router.post("/reset-password")
 def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
     """
-    Verifies 6-digit OTP reset code and updates user's account password.
+    Verifies 6-digit OTP reset code from the database and updates user's account password.
     """
     clean_email = (req.email or "").strip().lower()
     user = db.query(User).filter(func.lower(User.email) == clean_email).first()
     if not user:
         raise HTTPException(status_code=404, detail="Registered user account not found.")
 
-    stored_entry = RESET_OTP_STORE.get(clean_email)
-    if not stored_entry:
-        raise HTTPException(status_code=400, detail="Invalid or expired 6-digit OTP reset code.")
+    otp_record = db.query(PasswordResetOTP).filter(func.lower(PasswordResetOTP.email) == clean_email).first()
+    if not otp_record:
+        raise HTTPException(status_code=400, detail="Invalid or expired 6-digit OTP reset code. Please request a new code.")
 
-    if time.time() > stored_entry["expires_at"]:
-        RESET_OTP_STORE.pop(clean_email, None)
+    if datetime.utcnow() > otp_record.expires_at:
+        db.delete(otp_record)
+        db.commit()
         raise HTTPException(status_code=400, detail="OTP reset code has expired. Please request a new OTP code.")
 
-    if stored_entry["code"] != req.reset_code.strip():
+    if str(otp_record.otp_code).strip() != str(req.reset_code).strip():
         raise HTTPException(status_code=400, detail="Invalid 6-digit OTP reset code.")
 
     # Update password
     user.hashed_password = get_password_hash(req.new_password)
-    db.commit()
-
     # Clear OTP (Single-use security)
-    RESET_OTP_STORE.pop(clean_email, None)
-
+    db.delete(otp_record)
+    
     audit = AuditLog(user_id=user.id, action="PASSWORD_RESET", details=f"User {user.email} reset password successfully.")
     db.add(audit)
     db.commit()
+
+    return {"message": "Password reset successfully. You can now log in with your new password."}
 
 

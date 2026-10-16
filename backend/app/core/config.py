@@ -49,6 +49,17 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "mockpassword")
     EMAIL_FROM: str = os.getenv("EMAIL_FROM", "noreply@neurodetect.ai")
 
+    # Brevo Transactional SMTP & API Configuration (Listing 10.2 & Listing B.3)
+    BREVO_SMTP_SERVER: str = os.getenv("BREVO_SMTP_SERVER", "smtp-relay.brevo.com")
+    BREVO_SMTP_PORT: int = int(os.getenv("BREVO_SMTP_PORT", "587"))
+    BREVO_SMTP_LOGIN: str = os.getenv("BREVO_SMTP_LOGIN", "")
+    BREVO_SMTP_PASSWORD: str = os.getenv("BREVO_SMTP_PASSWORD", "")
+    BREVO_SMTP_USER: str = os.getenv("BREVO_SMTP_USER", "")
+    BREVO_SMTP_KEY: str = os.getenv("BREVO_SMTP_KEY", "")
+    BREVO_API_KEY: str = os.getenv("BREVO_API_KEY", "")
+    BREVO_SENDER_EMAIL: str = os.getenv("BREVO_SENDER_EMAIL", "noreply@neurodetect.hospital.org")
+    BREVO_SENDER_NAME: str = os.getenv("BREVO_SENDER_NAME", "NeuroDetect Medical Portal")
+
     # Supabase Private Storage Configuration
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
     SUPABASE_SERVICE_ROLE_KEY: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", os.getenv("SUPABASE_KEY", ""))

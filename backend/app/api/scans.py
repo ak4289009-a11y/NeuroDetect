@@ -163,7 +163,10 @@ async def upload_and_predict_mri(
         local_file_path=mri_file_path,
         file_extension=ext
     )
-    mri_scan.file_path = storage_path
+    if supabase_storage.is_configured and access_url and access_url.startswith("http"):
+        mri_scan.file_path = storage_path
+    else:
+        mri_scan.file_path = f"/uploads/mri/{sanitized_filename}"
     db.commit()
     db.refresh(mri_scan)
 

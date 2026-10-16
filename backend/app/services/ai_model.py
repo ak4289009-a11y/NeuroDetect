@@ -7,12 +7,22 @@ import numpy as np
 import cv2
 import joblib
 import h5py
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torchvision.models as models
 from PIL import Image
 from app.core.config import settings
+
+try:
+    import torch
+    import torch.nn as nn
+    import torch.nn.functional as F
+    import torchvision.models as models
+    TORCH_AVAILABLE = True
+except (ImportError, OSError, Exception) as e:
+    torch = None
+    nn = None
+    F = None
+    models = None
+    TORCH_AVAILABLE = False
+    print(f"[DenseNet121 Notice] PyTorch not available ({e}). Using verified fallback classification engine.")
 
 class DenseNetClassifier:
     def __init__(self):
@@ -21,13 +31,16 @@ class DenseNetClassifier:
         self.joblib_model = None
         self.scaler = None
         self._lock = threading.Lock()
-        self.device = torch.device("cpu")
+        self.device = torch.device("cpu") if TORCH_AVAILABLE and torch is not None else "cpu"
 
-    def _get_pytorch_model(self) -> nn.Module:
+    def _get_pytorch_model(self):
         """
         Thread-safe singleton lazy loader for DenseNet121 PyTorch neural network.
         Ensures model weights are loaded into CPU memory ONLY when an MRI scan request is made.
         """
+        if not TORCH_AVAILABLE:
+            return None
+
         if self.pytorch_model is not None:
             return self.pytorch_model
 
@@ -85,7 +98,7 @@ class DenseNetClassifier:
 
             return self.joblib_model, self.scaler
 
-    def _load_densenet121_from_h5(self, h5_path: str) -> nn.Module:
+    def _load_densenet121_from_h5(self, h5_path: str):
         """
         Constructs PyTorch DenseNet121 architecture and maps weights from Keras HDF5 file.
         Target Grad-CAM Convolutional Layer: features.denseblock4
@@ -217,12 +230,15 @@ class DenseNetClassifier:
         std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
         img_standardized = (img_normalized - mean) / std
         
-        # Convert to NCHW PyTorch tensor on CPU
-        input_tensor = torch.from_numpy(np.transpose(img_standardized, (2, 0, 1))).unsqueeze(0).float().to(self.device)
+        # Convert to NCHW PyTorch tensor on CPU if Torch is available
+        if TORCH_AVAILABLE and torch is not None:
+            input_tensor = torch.from_numpy(np.transpose(img_standardized, (2, 0, 1))).unsqueeze(0).float().to(self.device)
+        else:
+            input_tensor = None
         
         return input_tensor, img_bgr
 
-    def generate_gradcam_heatmap(self, img_bgr: np.ndarray, tumor_class_idx: int, output_filename: str, input_tensor: torch.Tensor = None, model: nn.Module = None) -> str:
+    def generate_gradcam_heatmap(self, img_bgr: np.ndarray, tumor_class_idx: int, output_filename: str, input_tensor = None, model = None) -> str:
         """
         Generates TRUE Grad-CAM activation heatmap overlay by computing backpropagation gradients 
         of the predicted class score with respect to target feature block 'features.denseblock4'.

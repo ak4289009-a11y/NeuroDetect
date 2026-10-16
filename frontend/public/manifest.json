@@ -1,0 +1,59 @@
+{
+  "name": "NeuroDetect: Brain Tumor Clinical Decision Support",
+  "short_name": "NeuroDetect",
+  "description": "An Explainable Artificial Intelligence Clinical Decision Support System for Multi-Class Brain Tumor Detection from Magnetic Resonance Imaging",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0F172A",
+  "theme_color": "#2563EB",
+  "categories": ["medical", "health", "education", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Upload MRI Scan",
+      "short_name": "Upload MRI",
+      "description": "Upload a new axial brain MRI scan for AI analysis",
+      "url": "/#upload",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Clinical Reviews",
+      "short_name": "Reviews",
+      "description": "Open attending clinician triage queue",
+      "url": "/#reviews",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}

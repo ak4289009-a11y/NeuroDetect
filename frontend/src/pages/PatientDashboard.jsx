@@ -184,10 +184,10 @@ const PatientDashboard = () => {
     <div className="min-h-screen bg-gray-50 text-gray-800 flex flex-col font-sans">
       <Navbar />
 
-      <div className="flex-1 flex max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 gap-6">
+      <div className="flex-1 flex flex-col lg:flex-row max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 gap-4 sm:gap-6">
         <Sidebar currentTab={currentTab} setCurrentTab={setCurrentTab} />
 
-        <main className="flex-1 space-y-5">
+        <main className="flex-1 min-w-0 space-y-5">
           
           {/* TAB 1: DASHBOARD OVERVIEW */}
           {currentTab === 'dashboard' && (

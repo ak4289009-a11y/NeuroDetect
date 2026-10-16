@@ -1,7 +1,7 @@
 import React from 'react';
 
 const StatusBadge = ({ status, className = '' }) => {
-  const val = (status || '').toUpperCase().strip ? (status || '').toUpperCase().strip() : (status || '').toUpperCase();
+  const val = (status || '').toString().trim().toUpperCase();
 
   let colorClasses = 'bg-gray-50 text-gray-700 border-gray-200';
   if (['APPROVED', 'COMPLETED', 'SCHEDULED', 'ACTIVE'].includes(val)) {

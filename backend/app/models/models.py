@@ -48,6 +48,7 @@ class Patient(Base):
     gender = Column(String(50), nullable=False)
     phone = Column(String(50), nullable=False)
     address = Column(Text, nullable=True)
+    medical_history = Column(Text, nullable=True)
 
     user = relationship("User", back_populates="patient_profile")
     scans = relationship("MRIScan", back_populates="patient", cascade="all, delete-orphan")
@@ -232,6 +233,15 @@ class Message(Base):
 
 class RegistrationOTP(Base):
     __tablename__ = "registration_otps"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    otp_code = Column(String(20), nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class PasswordResetOTP(Base):
+    __tablename__ = "password_reset_otps"
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, index=True, nullable=False)

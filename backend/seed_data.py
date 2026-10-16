@@ -11,43 +11,34 @@ from app.models.models import (
 )
 
 def create_sample_mri_images():
-    """Generates synthetic high-quality MRI scans and Grad-CAM heatmaps for demonstration."""
+    """Populates authentic clinical axial brain MRI scans and Grad-CAM heatmaps for demonstration."""
+    import shutil
     os.makedirs(settings.MRI_UPLOAD_DIR, exist_ok=True)
     os.makedirs(settings.HEATMAP_DIR, exist_ok=True)
 
+    static_assets_dir = os.path.join(settings.BASE_DIR, "app", "static", "clinical_mri_assets")
+
     sample_images = [
-        ("mri_sample_glioma.png", "heatmap_sample_glioma.png", "Glioma"),
-        ("mri_sample_meningioma.png", "heatmap_sample_meningioma.png", "Meningioma"),
-        ("mri_sample_pituitary.png", "heatmap_sample_pituitary.png", "Pituitary"),
-        ("mri_sample_notumor.png", "heatmap_sample_notumor.png", "No Tumor"),
+        ("mri_sample_glioma.png", "heatmap_sample_glioma.png"),
+        ("mri_sample_meningioma.png", "heatmap_sample_meningioma.png"),
+        ("mri_sample_pituitary.png", "heatmap_sample_pituitary.png"),
+        ("mri_sample_notumor.png", "heatmap_sample_notumor.png"),
     ]
 
-    for mri_file, heatmap_file, tumor_type in sample_images:
+    for mri_file, heatmap_file in sample_images:
         mri_path = os.path.join(settings.MRI_UPLOAD_DIR, mri_file)
         heatmap_path = os.path.join(settings.HEATMAP_DIR, heatmap_file)
 
-        img = np.zeros((224, 224, 3), dtype=np.uint8)
-        cv2.ellipse(img, (112, 112), (85, 95), 0, 0, 360, (180, 180, 180), -1)
-        cv2.ellipse(img, (90, 110), (18, 40), 0, 0, 360, (40, 40, 40), -1)
-        cv2.ellipse(img, (134, 110), (18, 40), 0, 0, 360, (40, 40, 40), -1)
-        
-        if tumor_type == "Glioma":
-            cv2.circle(img, (75, 85), 25, (240, 240, 240), -1)
-        elif tumor_type == "Meningioma":
-            cv2.ellipse(img, (145, 140), (22, 18), 30, 0, 360, (235, 235, 235), -1)
-        elif tumor_type == "Pituitary":
-            cv2.circle(img, (112, 160), (16), (250, 250, 250), -1)
+        src_mri = os.path.join(static_assets_dir, mri_file)
+        src_heatmap = os.path.join(static_assets_dir, heatmap_file)
 
-        img = cv2.GaussianBlur(img, (5, 5), 0)
-        cv2.imwrite(mri_path, img)
+        # Ensure high-resolution real clinical images are preserved
+        if os.path.exists(src_mri) and (not os.path.exists(mri_path) or os.path.getsize(mri_path) < 50000):
+            shutil.copy2(src_mri, mri_path)
 
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        if tumor_type == "No Tumor":
-            heatmap = cv2.applyColorMap(gray, cv2.COLORMAP_VIRIDIS)
-        else:
-            heatmap = cv2.applyColorMap(gray, cv2.COLORMAP_JET)
-        overlay = cv2.addWeighted(img, 0.55, heatmap, 0.45, 0)
-        cv2.imwrite(heatmap_path, overlay)
+        if os.path.exists(src_heatmap) and (not os.path.exists(heatmap_path) or os.path.getsize(heatmap_path) < 50000):
+            shutil.copy2(src_heatmap, heatmap_path)
+
 
 def seed_database():
     Base.metadata.create_all(bind=engine)
@@ -73,7 +64,8 @@ def seed_database():
 
         # 2. DOCTORS BY INDIA-WIDE LOCATION
         doctors_data = [
-            ("dr.smith@neurodetect.ai", "Doctor@123456", "Dr. Rajesh Kumar", "Senior Neuro-Oncologist", "AIIMS Medical Center", "New Delhi", "New Delhi, Delhi, India", "MED-AIIMS-99201", 14, True),
+            ("dr.rajesh@neurodetect.ai", "Doctor@123456", "Dr. Rajesh Kumar", "Senior Neuro-Oncologist", "AIIMS Medical Center", "New Delhi", "New Delhi, Delhi, India", "MED-AIIMS-99201", 14, True),
+            ("dr.smith@neurodetect.ai", "Doctor@123456", "Dr. Rajesh Kumar", "Senior Neuro-Oncologist", "AIIMS Medical Center", "New Delhi", "New Delhi, Delhi, India", "MED-AIIMS-99200", 14, True),
             ("dr.thorne@neurodetect.ai", "Doctor@123456", "Dr. Sunita Patel", "Chief Neuroradiologist", "Apollo Hospital", "Mumbai", "Mumbai, MH, India", "MED-APOLLO-77123", 16, True),
             ("dr.vikram@neurodetect.ai", "Doctor@123456", "Dr. Vikram Rao", "Consultant Neurosurgeon", "Manipal Hospital", "Bangalore", "Bangalore, KA, India", "MED-MANIPAL-44321", 12, True),
             ("dr.ananya@neurodetect.ai", "Doctor@123456", "Dr. Ananya Sharma", "Neuro-radiology Specialist", "SMS Hospital", "Jaipur", "Jaipur, RJ, India", "MED-SMS-88901", 10, True),

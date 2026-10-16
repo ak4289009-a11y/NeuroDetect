@@ -31,9 +31,12 @@ Authorization: Bearer <access_token>
 ### A. Authentication (`/auth`)
 | Method | Path | Description | Access |
 |---|---|---|---|
-| `POST` | `/auth/register/patient` | Register a new patient account | Public |
-| `POST` | `/auth/register/doctor` | Register a doctor account (Status set to PENDING) | Public |
+| `POST` | `/auth/request-otp` | Request 6-digit registration OTP code dispatched via Brevo SMTP | Public |
+| `POST` | `/auth/register/patient` | Register a new patient account (verifying registration OTP) | Public |
+| `POST` | `/auth/register/doctor` | Register a doctor account (Status set to PENDING verification) | Public |
 | `POST` | `/auth/login` | Authenticate user & return JWT token with role claims | Public |
+| `POST` | `/auth/forgot-password` | Dispatch 6-digit database-backed OTP to user's registered email | Public |
+| `POST` | `/auth/reset-password` | Verify 6-digit OTP from database and update user password (single-use) | Public |
 | `GET` | `/auth/me` | Retrieve profile of authenticated user | Authenticated |
 
 ### B. MRI Scans & AI Pipeline (`/scans`)
@@ -41,17 +44,20 @@ Authorization: Bearer <access_token>
 |---|---|---|---|
 | `POST` | `/scans/upload` | Upload MRI image (JPG, PNG, JPEG), run DenseNet121 inference & Grad-CAM heatmap | Patient, Admin |
 | `GET` | `/scans/patient` | Retrieve all MRI scans for logged-in patient | Patient |
+| `GET` | `/scans/pending` | Retrieve MRI scans pending doctor review (`AI_COMPLETED` status) | Doctor |
+| `GET` | `/scans/all` | Retrieve all authorized scans across doctors and admins | Doctor, Admin |
 | `GET` | `/scans/{scan_id}` | Get single scan details | Authenticated |
 
 ### C. Diagnostic Reports (`/reports`)
 | Method | Path | Description | Access |
 |---|---|---|---|
 | `GET` | `/reports/{report_id}/pdf` | Generate & download ReportLab PDF report | Authenticated |
-| `POST` | `/reports/{report_id}/email` | Email PDF report to patient's registered email | Authenticated |
+| `POST` | `/reports/{report_id}/email` | Email PDF report to patient's registered email via SMTP (Brevo) | Authenticated |
 
 ### D. Doctor Clinical Workflows (`/doctors`)
 | Method | Path | Description | Access |
 |---|---|---|---|
+| `GET` | `/doctors/patients` | Retrieve scoped patient cohort (patients assigned, scans, appointments) | Doctor |
 | `GET` | `/doctors/pending-scans` | List scans awaiting doctor review | Doctor, Admin |
 | `POST` | `/doctors/review` | Submit diagnosis, notes, prescriptions, and approval status | Doctor, Admin |
 | `GET` | `/doctors/patients/history/{patient_id}` | Retrieve patient clinical timeline & scan history | Doctor, Admin |
@@ -64,7 +70,7 @@ Authorization: Bearer <access_token>
 | `GET` | `/admin/doctors` | List all doctors in system | Admin |
 | `PUT` | `/admin/doctors/{id}/reset-password` | Reset doctor password | Admin |
 | `DELETE` | `/admin/doctors/{id}` | Delete doctor account | Admin |
-| `GET` | `/admin/patients` | List all patients | Admin, Doctor |
+| `GET` | `/admin/patients` | List all patients across system (Strictly Admin only) | Admin |
 | `DELETE` | `/admin/patients/{id}` | Delete patient account | Admin |
 | `GET` | `/admin/audit-logs` | Retrieve system audit logs | Admin |
 

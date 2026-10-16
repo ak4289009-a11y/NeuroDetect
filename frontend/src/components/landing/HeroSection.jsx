@@ -18,7 +18,7 @@ const HeroSection = () => {
               <span>AI Powered</span> 
             </div>
 
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 leading-tight">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-900 leading-tight break-words">
               AI Based Brain Tumor Detection using DenseNet121
             </h1>
 

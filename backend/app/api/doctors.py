@@ -117,6 +117,16 @@ def get_pending_scans_for_doctor(
     auth_scans = get_authorized_scans(current_user, db)
     return [s for s in auth_scans if s.status in [ScanStatus.AI_COMPLETED.value, ScanStatus.UNDER_REVIEW.value]]
 
+@router.get("/patients", response_model=List[PatientOut])
+def get_authorized_patients_for_doctor(
+    current_user: User = Depends(require_role(["DOCTOR", "ADMIN"])),
+    db: Session = Depends(get_db)
+):
+    """
+    Retrieves only authorized patients for the logged-in doctor (assigned scans, appointments, messages, same hospital).
+    """
+    return get_authorized_patients(current_user, db)
+
 @router.post("/review", response_model=DoctorReviewOut)
 def review_scan_report(
     review_in: DoctorReviewCreate,
@@ -404,21 +414,31 @@ def book_patient_appointment(
     return new_appt
 
 @router.get("/appointments/my-appointments")
-def get_my_patient_appointments(
-    current_user: User = Depends(require_role(["PATIENT", "ADMIN"])),
+@router.get("/appointments/doctor")
+def get_my_appointments(
+    current_user: User = Depends(require_role(["PATIENT", "DOCTOR", "ADMIN"])),
     db: Session = Depends(get_db)
 ):
     """
-    Retrieves all booked appointments for the logged-in patient.
+    Retrieves all booked appointments for the logged-in user (patient or attending doctor).
     """
-    patient = current_user.patient_profile
-    if not patient and current_user.role == "PATIENT":
-        return []
-
-    patient_id = patient.id if patient else 1
-    appts = db.query(Appointment).filter(
-        Appointment.patient_id == patient_id
-    ).order_by(Appointment.appointment_date.asc()).all()
+    if current_user.role == "DOCTOR":
+        doctor = current_user.doctor_profile
+        if not doctor:
+            # Fallback for doctor user without explicit profile
+            doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
+        doctor_id = doctor.id if doctor else 1
+        appts = db.query(Appointment).filter(
+            Appointment.doctor_id == doctor_id
+        ).order_by(Appointment.appointment_date.asc()).all()
+    else:
+        patient = current_user.patient_profile
+        if not patient and current_user.role == "PATIENT":
+            return []
+        patient_id = patient.id if patient else 1
+        appts = db.query(Appointment).filter(
+            Appointment.patient_id == patient_id
+        ).order_by(Appointment.appointment_date.asc()).all()
 
     result = []
     for a in appts:

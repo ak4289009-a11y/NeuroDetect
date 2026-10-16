@@ -329,6 +329,43 @@ const MriUploadBox = ({ onScanComplete, setToastMessage }) => {
             </div>
           </div>
 
+          {/* Visual Explainability: Original MRI Scan and Grad-CAM Heatmap */}
+          <div className="p-3 bg-white border border-blue-200 rounded-lg space-y-2 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-gray-800 text-[11px] uppercase tracking-wide flex items-center gap-1.5">
+                <Brain className="w-3.5 h-3.5 text-blue-600" />
+                <span>Explainable AI: Neural Network Attention Localization</span>
+              </span>
+              <span className="text-[10px] text-gray-500 font-mono">DenseNet-121 Grad-CAM</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-center">
+              <div className="bg-gray-50 p-2 border border-gray-200 rounded-lg space-y-1">
+                <p className="text-[10px] font-bold text-gray-600">Original Axial Brain MRI</p>
+                <img
+                  src={predictionOutput.file_path || filePreviewUrl}
+                  alt="Original MRI"
+                  className="w-full h-32 object-contain rounded bg-slate-900 mx-auto"
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                />
+              </div>
+              <div className="bg-gray-50 p-2 border border-gray-200 rounded-lg space-y-1">
+                <p className="text-[10px] font-bold text-blue-700">Grad-CAM Activation Heatmap</p>
+                {predictionOutput.ai_report?.heatmap_path ? (
+                  <img
+                    src={predictionOutput.ai_report.heatmap_path}
+                    alt="Grad-CAM Activation Heatmap"
+                    className="w-full h-32 object-contain rounded bg-slate-900 mx-auto"
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
+                ) : (
+                  <div className="h-32 flex items-center justify-center text-gray-400 bg-gray-100 rounded text-[11px]">
+                    Heatmap generating...
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
           <div className="pt-2 flex justify-end">
             <button
               onClick={() => reportAPI.downloadPDF(predictionOutput.ai_report?.id)}

@@ -162,10 +162,10 @@ def delete_doctor(
 
 @router.get("/patients", response_model=List[PatientOut])
 def get_all_patients(
-    current_user: User = Depends(require_role(["ADMIN", "DOCTOR"])),
+    current_user: User = Depends(require_role(["ADMIN"])),
     db: Session = Depends(get_db)
 ):
-    """Lists all registered patients."""
+    """Admin endpoint to list all registered patients."""
     return db.query(Patient).all()
 
 @router.delete("/patients/{patient_id}")

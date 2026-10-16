@@ -59,6 +59,7 @@ export const doctorAPI = {
   getLocations: () => api.get('/doctors/locations'),
   getSuggestions: (q) => api.get('/doctors/suggestions', { params: { q } }),
   getPendingScans: () => api.get('/doctors/pending-scans'),
+  getPatients: () => api.get('/doctors/patients'),
   getAppointments: () => api.get('/doctors/appointments'),
   submitReview: (reviewData) => api.post('/doctors/review', reviewData),
   getPatientHistory: (patientId) => api.get(`/doctors/patients/history/${patientId}`),

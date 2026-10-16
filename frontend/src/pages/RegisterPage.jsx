@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User, Stethoscope, ArrowLeft, CheckCircle2, Key, X, Mail } from 'lucide-react';
+import { User, Stethoscope, ArrowLeft, CheckCircle2, Key, X, Mail, Eye, EyeOff } from 'lucide-react';
 import { authAPI, doctorAPI } from '../services/api';
 import Toast from '../components/common/Toast';
 import Logo from '../components/common/Logo';
@@ -10,6 +10,10 @@ const RegisterPage = () => {
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
   const navigate = useNavigate();
+
+  // Password visibility states
+  const [showPatientPassword, setShowPatientPassword] = useState(false);
+  const [showDoctorPassword, setShowDoctorPassword] = useState(false);
 
   // Registration OTP Modal State
   const [showOtpModal, setShowOtpModal] = useState(false);
@@ -186,7 +190,25 @@ const RegisterPage = () => {
 
               <div>
                 <label className="block font-semibold mb-1">Password *</label>
-                <input type="password" required value={patientForm.password} onChange={(e) => setPatientForm({ ...patientForm, password: e.target.value })} placeholder="••••••••" className="w-full p-2.5 bg-white border border-gray-200 rounded-lg text-xs" />
+                <div className="relative">
+                  <input
+                    type={showPatientPassword ? "text" : "password"}
+                    required
+                    value={patientForm.password}
+                    onChange={(e) => setPatientForm({ ...patientForm, password: e.target.value })}
+                    placeholder="••••••••"
+                    className="w-full p-2.5 pr-10 bg-white border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPatientPassword(!showPatientPassword)}
+                    className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 focus:outline-none"
+                    tabIndex="-1"
+                    aria-label={showPatientPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPatientPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               <div>
@@ -260,7 +282,25 @@ const RegisterPage = () => {
 
               <div>
                 <label className="block font-semibold mb-1">Password *</label>
-                <input type="password" required value={doctorForm.password} onChange={(e) => setDoctorForm({ ...doctorForm, password: e.target.value })} placeholder="••••••••" className="w-full p-2.5 bg-white border border-gray-200 rounded-lg text-xs" />
+                <div className="relative">
+                  <input
+                    type={showDoctorPassword ? "text" : "password"}
+                    required
+                    value={doctorForm.password}
+                    onChange={(e) => setDoctorForm({ ...doctorForm, password: e.target.value })}
+                    placeholder="••••••••"
+                    className="w-full p-2.5 pr-10 bg-white border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowDoctorPassword(!showDoctorPassword)}
+                    className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 focus:outline-none"
+                    tabIndex="-1"
+                    aria-label={showDoctorPassword ? "Hide password" : "Show password"}
+                  >
+                    {showDoctorPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               <div>

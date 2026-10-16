@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  html, body {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+}
+
 @layer utilities {
   .card-simple {
     @apply bg-white border border-gray-200 rounded-lg p-5 shadow-sm;

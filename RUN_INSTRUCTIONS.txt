@@ -1,0 +1,52 @@
+================================================================================
+NEURODETECT: BRAIN TUMOR DETECTION SYSTEM (MCA MAJOR PROJECT)
+Indira Gandhi National Open University (IGNOU)
+Student: Anuradha Kumari (Enrolment No: 2353902714)
+Guide: Mr. Rafi Anwar (SOCIS, IGNOU)
+Course: MCSP-232 / BCSP-064
+================================================================================
+
+HOW TO RUN THE APPLICATION:
+--------------------------
+1. Double-click the file "START_NEURODETECT.bat" in this directory.
+2. The application will start and open automatically in your web browser at:
+   http://127.0.0.1:8000
+
+(Note: Node.js is NOT required. The React frontend is already compiled into
+backend distribution and served directly by the Python application server.)
+
+
+LOGIN CREDENTIALS FOR TESTING:
+-----------------------------
+1. Patient Account:
+   - Email:    patient@neurodetect.ai
+   - Password:  Patient@123456
+   - Access:   Upload MRI scans, view diagnosis, download PDF reports
+
+2. Doctor Account:
+   - Email:    dr.rajesh@neurodetect.ai
+   - Password:  Doctor@123456
+   - Access:   Review patient scans, confirm diagnosis, clinical sign-off
+
+3. Administrator Account:
+   - Email:    admin@neurodetect.ai
+   - Password:  Admin@123456
+   - Access:   Approve doctor registrations, view users and audit logs
+
+
+TEST MRI SCANS FOR DEMONSTRATION:
+---------------------------------
+Sample test MRI scans are provided in the "sample_test_scans" directory:
+- sample_test_scans\1_Glioma\mri_sample_glioma.png
+- sample_test_scans\2_Meningioma\mri_sample_meningioma.png
+- sample_test_scans\3_Pituitary\mri_sample_pituitary.png
+- sample_test_scans\4_No_Tumor\mri_sample_notumor.png
+
+
+DOCUMENTATION FILES:
+--------------------
+- IGNOU_MCA_PROJECT_REPORT_SUBMISSION.pdf  (Official 104-page Project Report)
+- IGNOU_MCA_PROJECT_REPORT_SUBMISSION.docx (Official 104-page Project Report in Word)
+- docs\API_DOCUMENTATION.md                (API documentation)
+- database\schema.sql                      (Database SQL schema script)
+================================================================================

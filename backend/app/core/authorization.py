@@ -100,54 +100,99 @@ def verify_doctor_patient_access(
 
     return False
 
+def get_doctor_authorized_patient_ids(doctor: Doctor, db: Session) -> Set[int]:
+    """
+    High-performance pre-computation of all patient IDs authorized for a doctor.
+    Consolidates assigned scans, appointments, direct messaging, and hospital colleagues.
+    Reduces O(N*M) query loops down to targeted indexed queries.
+    """
+    if not doctor or not doctor.is_approved:
+        return set()
+
+    from app.models.models import MRIScan, Appointment, Message, Doctor
+
+    authorized_ids: Set[int] = set()
+
+    # 1. Patients with scans assigned directly to this doctor
+    assigned_pat_tuples = db.query(MRIScan.patient_id).filter(MRIScan.preferred_doctor_id == doctor.id).all()
+    authorized_ids.update(p[0] for p in assigned_pat_tuples)
+
+    # 2. Patients with appointments scheduled with this doctor
+    appt_pat_tuples = db.query(Appointment.patient_id).filter(Appointment.doctor_id == doctor.id).all()
+    authorized_ids.update(p[0] for p in appt_pat_tuples)
+
+    # 3. Patients who have exchanged clinical messages with this doctor
+    msg_pat_tuples = db.query(Message.patient_id).filter(Message.doctor_id == doctor.id).all()
+    authorized_ids.update(p[0] for p in msg_pat_tuples)
+
+    # 4. Same-hospital network relationship
+    if doctor.hospital:
+        doc_hosp_norm = normalize_hospital_name(doctor.hospital)
+        colleagues = db.query(Doctor.id).filter(
+            Doctor.hospital.ilike(f"%{doc_hosp_norm}%")
+        ).all()
+        colleague_ids = [c[0] for c in colleagues]
+        if colleague_ids:
+            hosp_scans = db.query(MRIScan.patient_id).filter(MRIScan.preferred_doctor_id.in_(colleague_ids)).all()
+            authorized_ids.update(p[0] for p in hosp_scans)
+            hosp_appts = db.query(Appointment.patient_id).filter(Appointment.doctor_id.in_(colleague_ids)).all()
+            authorized_ids.update(p[0] for p in hosp_appts)
+
+    return authorized_ids
+
 def get_authorized_scans(current_user, db: Session):
     """
-    Centralized helper returning MRIScan objects authorized for the logged-in user.
+    High-performance centralized helper returning MRIScan objects authorized for the logged-in user.
     - Admin: All scans.
-    - Patient: Scans belonging to patient.
-    - Doctor: Scans authorized via verify_doctor_patient_access.
+    - Patient: Scans belonging to patient directly.
+    - Doctor: Scans belonging to authorized patient cohort (assigned, appointment, messages, hospital).
     """
     from app.models.models import MRIScan
-    all_scans = db.query(MRIScan).order_by(MRIScan.upload_date.desc()).all()
+
     if current_user.role == "ADMIN":
-        return all_scans
+        return db.query(MRIScan).order_by(MRIScan.upload_date.desc()).all()
 
     if current_user.role == "PATIENT":
         patient = current_user.patient_profile
         if not patient:
             return []
-        return [s for s in all_scans if s.patient_id == patient.id]
-
-    if current_user.role == "DOCTOR":
-        doctor = current_user.doctor_profile
-        if not doctor or not doctor.is_approved:
-            return []
-        return [s for s in all_scans if verify_doctor_patient_access(doctor, s.patient_id, db, scan_id=s.id)]
-
-    return []
-
-def get_authorized_patients(current_user, db: Session):
-    """
-    Centralized helper returning Patient objects authorized for the logged-in user.
-    - Admin: All patients.
-    - Doctor: Patients authorized via verify_doctor_patient_access or active message history.
-    """
-    from app.models.models import Patient, Message
-    all_patients = db.query(Patient).all()
-    if current_user.role == "ADMIN":
-        return all_patients
+        return db.query(MRIScan).filter(MRIScan.patient_id == patient.id).order_by(MRIScan.upload_date.desc()).all()
 
     if current_user.role == "DOCTOR":
         doctor = current_user.doctor_profile
         if not doctor or not doctor.is_approved:
             return []
         
-        msg_patient_ids = set(
-            m.patient_id for m in db.query(Message).filter(Message.doctor_id == doctor.id).all()
-        )
-        return [
-            p for p in all_patients 
-            if p.id in msg_patient_ids or verify_doctor_patient_access(doctor, p.id, db)
-        ]
+        authorized_patient_ids = get_doctor_authorized_patient_ids(doctor, db)
+        if not authorized_patient_ids:
+            return []
+
+        return db.query(MRIScan).filter(
+            MRIScan.patient_id.in_(authorized_patient_ids)
+        ).order_by(MRIScan.upload_date.desc()).all()
+
+    return []
+
+def get_authorized_patients(current_user, db: Session):
+    """
+    High-performance centralized helper returning Patient objects authorized for the logged-in user.
+    - Admin: All patients.
+    - Doctor: Patients authorized via doctor care cohort.
+    """
+    from app.models.models import Patient
+
+    if current_user.role == "ADMIN":
+        return db.query(Patient).all()
+
+    if current_user.role == "DOCTOR":
+        doctor = current_user.doctor_profile
+        if not doctor or not doctor.is_approved:
+            return []
+        
+        authorized_patient_ids = get_doctor_authorized_patient_ids(doctor, db)
+        if not authorized_patient_ids:
+            return []
+
+        return db.query(Patient).filter(Patient.id.in_(authorized_patient_ids)).all()
 
     return []

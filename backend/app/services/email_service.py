@@ -1,35 +1,127 @@
+import os
 import smtplib
+import re
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import httpx
 from app.core.config import settings
 
-def send_email_notification(to_email: str, subject: str, body_html: str) -> bool:
+EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+def is_valid_email_address(email: str) -> bool:
+    """Validates basic RFC email address structure and presence of a domain."""
+    if not email or not isinstance(email, str):
+        return False
+    clean = email.strip()
+    return bool(EMAIL_REGEX.match(clean))
+
+def send_brevo_api_email(to_email: str, subject: str, body_html: str) -> bool:
     """
-    Sends email notification via SMTP (Gmail).
-    Returns True if successfully dispatched to SMTP host, False if credentials/connection failed.
-    Never prints password or confidential tokens.
+    Delivers a transactional email using the official Brevo (Sendinblue) v3 REST API.
+    Uses BREVO_API_KEY, BREVO_SENDER_EMAIL, and BREVO_SENDER_NAME from environment.
+    Never prints or logs secret credentials or sensitive token payloads.
     """
-    if not settings.SMTP_USER or not settings.SMTP_PASSWORD or settings.SMTP_PASSWORD == "mockpassword":
-        print(f"[SMTP Notice] SMTP_PASSWORD is not configured in backend/.env. Email dispatch to {to_email} skipped.")
+    if not settings.BREVO_API_KEY or settings.BREVO_API_KEY.startswith("xkeysib-your_brevo_api_key"):
+        return False
+    if not is_valid_email_address(settings.BREVO_SENDER_EMAIL):
+        print(f"[Brevo API Error] Invalid BREVO_SENDER_EMAIL domain configuration: '{settings.BREVO_SENDER_EMAIL}'.")
+        return False
+    if not is_valid_email_address(to_email):
+        print(f"[Brevo API Error] Invalid recipient email address: '{to_email}'.")
         return False
 
+    url = "https://api.brevo.com/v3/smtp/email"
+    headers = {
+        "accept": "application/json",
+        "api-key": settings.BREVO_API_KEY,
+        "content-type": "application/json",
+    }
+    payload = {
+        "sender": {
+            "name": settings.BREVO_SENDER_NAME or "NeuroDetect Security Desk",
+            "email": settings.BREVO_SENDER_EMAIL,
+        },
+        "to": [{"email": to_email.strip()}],
+        "subject": subject,
+        "htmlContent": body_html,
+    }
     try:
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = subject
-        msg['From'] = settings.EMAIL_FROM
-        msg['To'] = to_email
+        with httpx.Client(timeout=12.0) as client:
+            response = client.post(url, headers=headers, json=payload)
+            if response.status_code in (200, 201, 202):
+                print(f"[Brevo API Success] Dispatched transactional email to {to_email} | Subject: '{subject}'")
+                return True
+            else:
+                try:
+                    err_data = response.json()
+                    err_msg = err_data.get("message", response.text)
+                except Exception:
+                    err_msg = response.text
+                print(f"[Brevo API Error] HTTP {response.status_code} from Brevo: {err_msg}")
+                return False
+    except Exception as exc:
+        print(f"[Brevo API Network Error] Failed dispatch to {to_email}: {type(exc).__name__} - {str(exc)}")
+        return False
 
-        html_part = MIMEText(body_html, 'html')
+def send_brevo_smtp_email(to_email: str, subject: str, body_html: str) -> bool:
+    """
+    Delivers transactional email via Brevo's authenticated SMTP relay (smtp-relay.brevo.com:587).
+    """
+    smtp_key = settings.BREVO_SMTP_KEY or settings.BREVO_API_KEY or settings.BREVO_SMTP_PASSWORD
+    smtp_user = settings.BREVO_SMTP_USER or settings.BREVO_SMTP_LOGIN or settings.BREVO_SENDER_EMAIL
+    if not smtp_key or not smtp_user or smtp_key.startswith("xkeysib-your_brevo"):
+        return False
+    if not is_valid_email_address(to_email):
+        print(f"[Brevo SMTP Error] Invalid recipient email: '{to_email}'")
+        return False
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"{settings.BREVO_SENDER_NAME} <{settings.BREVO_SENDER_EMAIL}>"
+        msg["To"] = to_email
+        html_part = MIMEText(body_html, "html")
         msg.attach(html_part)
+        with smtplib.SMTP(settings.BREVO_SMTP_SERVER, settings.BREVO_SMTP_PORT, timeout=12) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(smtp_user, smtp_key)
+            server.sendmail(settings.BREVO_SENDER_EMAIL, [to_email], msg.as_string())
+        print(f"[Brevo SMTP Success] Dispatched email to {to_email} | Subject: '{subject}'")
+        return True
+    except Exception as exc:
+        print(f"[Brevo SMTP Error] Dispatch failed to {to_email}: {type(exc).__name__} - {str(exc)}")
+        return False
 
+def send_legacy_smtp_email(to_email: str, subject: str, body_html: str) -> bool:
+    """Fallback standard SMTP dispatch (e.g. Gmail) when configured."""
+    if not settings.SMTP_USER or not settings.SMTP_PASSWORD or settings.SMTP_PASSWORD == "mockpassword":
+        return False
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = settings.EMAIL_FROM
+        msg["To"] = to_email
+        html_part = MIMEText(body_html, "html")
+        msg.attach(html_part)
         with smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=12) as server:
             server.ehlo()
             server.starttls()
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            server.sendmail(settings.EMAIL_FROM, to_email, msg.as_string())
-
-        print(f"[SMTP Email Success] Dispatched email to {to_email} | Subject: '{subject}'")
+            server.sendmail(settings.EMAIL_FROM, [to_email], msg.as_string())
+        print(f"[SMTP Success] Dispatched fallback email to {to_email} | Subject: '{subject}'")
         return True
-    except Exception as e:
-        print(f"[SMTP Email Error] Failed to send email to {to_email}: {type(e).__name__} - {str(e)}")
+    except Exception as exc:
+        print(f"[SMTP Error] Failed fallback dispatch to {to_email}: {type(exc).__name__} - {str(exc)}")
         return False
+
+def send_brevo_email(to_email: str, subject: str, body_html: str) -> bool:
+    """Unified email dispatcher trying Brevo API, Brevo SMTP, then Legacy SMTP."""
+    if send_brevo_api_email(to_email, subject, body_html):
+        return True
+    if send_brevo_smtp_email(to_email, subject, body_html):
+        return True
+    return send_legacy_smtp_email(to_email, subject, body_html)
+
+def send_email_notification(to_email: str, subject: str, body_html: str) -> bool:
+    """Entrypoint function for all clinical and auth notifications."""
+    return send_brevo_email(to_email, subject, body_html)

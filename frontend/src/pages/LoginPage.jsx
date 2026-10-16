@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Activity, Lock, Mail, User, Stethoscope, ShieldCheck, ArrowLeft, Key, X, CheckCircle2 } from 'lucide-react';
+import { Activity, Lock, Mail, User, Stethoscope, ShieldCheck, ArrowLeft, Key, X, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../services/api';
 import Toast from '../components/common/Toast';
@@ -10,6 +10,7 @@ const LoginPage = () => {
   const [role, setRole] = useState('PATIENT'); // PATIENT | DOCTOR | ADMIN
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
@@ -20,7 +21,9 @@ const LoginPage = () => {
   const [forgotEmail, setForgotEmail] = useState('');
   const [resetOtp, setResetOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
 
   const { login } = useAuth();
@@ -167,13 +170,22 @@ const LoginPage = () => {
             <div className="relative">
               <Lock className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                className="w-full pl-9 pr-10 py-2 bg-white border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-600 focus:outline-none"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 focus:outline-none"
+                tabIndex="-1"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
 
@@ -205,34 +217,6 @@ const LoginPage = () => {
             {loading ? 'Authenticating...' : 'Sign In'}
           </button>
         </form>
-
-        {/* Quick Access Accounts */}
-        <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs space-y-2">
-          <p className="font-bold text-gray-700 text-[11px]">Quick Access Sample Login:</p>
-          <div className="grid grid-cols-3 gap-1.5 text-[11px]">
-            <button
-              type="button"
-              onClick={() => { setRole('PATIENT'); setEmail('patient@neurodetect.ai'); setPassword('Patient@123456'); }}
-              className="py-1 px-2 bg-white border border-gray-200 hover:border-blue-500 hover:text-blue-600 rounded text-gray-700 font-medium truncate transition-colors"
-            >
-              Patient
-            </button>
-            <button
-              type="button"
-              onClick={() => { setRole('DOCTOR'); setEmail('dr.smith@neurodetect.ai'); setPassword('Doctor@123456'); }}
-              className="py-1 px-2 bg-white border border-gray-200 hover:border-blue-500 hover:text-blue-600 rounded text-gray-700 font-medium truncate transition-colors"
-            >
-              Doctor
-            </button>
-            <button
-              type="button"
-              onClick={() => { setRole('ADMIN'); setEmail('admin@neurodetect.ai'); setPassword('Admin@123456'); }}
-              className="py-1 px-2 bg-white border border-gray-200 hover:border-blue-500 hover:text-blue-600 rounded text-gray-700 font-medium truncate transition-colors"
-            >
-              Admin
-            </button>
-          </div>
-        </div>
 
         <div className="text-center text-xs text-gray-500">
           Need an account?{' '}
@@ -306,26 +290,48 @@ const LoginPage = () => {
 
                 <div>
                   <label className="block font-semibold text-gray-700 mb-1">New Password</label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full p-2.5 bg-white border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-600 focus:outline-none"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? "text" : "password"}
+                      required
+                      placeholder="••••••••"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full p-2.5 pr-10 bg-white border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 focus:outline-none"
+                      tabIndex="-1"
+                      aria-label={showNewPassword ? "Hide password" : "Show password"}
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <div>
                   <label className="block font-semibold text-gray-700 mb-1">Confirm New Password</label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full p-2.5 bg-white border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-600 focus:outline-none"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      required
+                      placeholder="••••••••"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full p-2.5 pr-10 bg-white border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 focus:outline-none"
+                      tabIndex="-1"
+                      aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex gap-2 pt-2">

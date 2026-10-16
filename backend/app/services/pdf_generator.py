@@ -23,8 +23,12 @@ def generate_pdf_report(
     pdf_filename = f"NeuroDetect_Report_{report_id}.pdf"
     pdf_save_path = os.path.join(settings.REPORT_DIR, pdf_filename)
     
+    # Always generate fresh report to ensure latest real MRI scans and doctor signatures are rendered
     if os.path.exists(pdf_save_path):
-        return f"/reports/{pdf_filename}"
+        try:
+            os.remove(pdf_save_path)
+        except Exception:
+            pass
     
     doc = SimpleDocTemplate(
         pdf_save_path,
@@ -185,12 +189,12 @@ def generate_pdf_report(
     elements.append(Paragraph("<font color='#0284C7'>■</font> VISUAL EXPLAINABILITY (GRAD-CAM LOCALIZATION)", section_heading))
     
     if abs_mri_path and os.path.exists(abs_mri_path):
-        mri_img = RLImage(abs_mri_path, width=220, height=180)
+        mri_img = RLImage(abs_mri_path, width=200, height=200)
     else:
         mri_img = Paragraph("Original MRI Image File", body_style)
         
     if abs_heatmap_path and os.path.exists(abs_heatmap_path):
-        h_img = RLImage(abs_heatmap_path, width=220, height=180)
+        h_img = RLImage(abs_heatmap_path, width=200, height=200)
     else:
         h_img = Paragraph("Grad-CAM Heatmap File", body_style)
         
@@ -216,12 +220,19 @@ def generate_pdf_report(
     elements.append(Paragraph("<font color='#0284C7'>■</font> ATTENDING NEURO-SPECIALIST CLINICAL REVIEW", section_heading))
     if doctor_review_data:
         doc_info = doctor_review_data.get('doctor', {})
-        doc_name = doc_info.get('name', 'Rajesh Kumar')
+        doc_name = (doc_info.get('name') or 'Rajesh Kumar').strip()
+        if doc_name.lower().startswith("dr."):
+            clean_doc_name = doc_name[3:].strip()
+        elif doc_name.lower().startswith("dr "):
+            clean_doc_name = doc_name[2:].strip()
+        else:
+            clean_doc_name = doc_name
+
         specialty = doc_info.get('specialization', 'Senior Neuro-Oncologist')
         hospital = doc_info.get('hospital', 'All India Institute of Medical Sciences (AIIMS)')
         
         dr_table_data = [
-            [Paragraph(f"<b>Reviewing Specialist:</b> Dr. {doc_name} ({specialty}) — <i>{hospital}</i>", body_style)],
+            [Paragraph(f"<b>Reviewing Specialist:</b> Dr. {clean_doc_name} ({specialty}) — <i>{hospital}</i>", body_style)],
             [Paragraph(f"<b>Clinical Diagnosis:</b> {doctor_review_data.get('diagnosis', 'Normal study.')}", body_style)],
             [Paragraph(f"<b>Prescriptions & Advice:</b> {doctor_review_data.get('prescription', 'As advised by specialist.')}", body_style)],
             [Paragraph(f"<b>Suggested Lab Tests:</b> {doctor_review_data.get('suggested_tests', 'None')}", body_style)],
