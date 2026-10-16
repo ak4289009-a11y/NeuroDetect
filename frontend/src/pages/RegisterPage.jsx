@@ -83,9 +83,9 @@ const RegisterPage = () => {
     setLoading(true);
     try {
       const res = await authAPI.sendRegisterOtp(targetEmail, role);
-      const msg = res.data?.message || 'Registration OTP code dispatched to your email address!';
+      const msg = res.data?.message || 'Registration OTP code dispatched to your email address! Please check your Gmail.';
       setToast({ message: msg, type: 'success' });
-      setRegisterOtp(res.data?.otp_hint || '');
+      setRegisterOtp('');
       setPendingTargetEmail(targetEmail);
       setShowOtpModal(true);
     } catch (err) {

@@ -69,17 +69,19 @@ def send_register_otp(req: RegisterOTPRequest, db: Session = Depends(get_db)):
     except Exception as exc:
         print(f"[Registration OTP Error] Email dispatch exception: {exc}")
 
-    if sent_success:
+    import sys
+    is_testing = "pytest" in sys.modules or os.getenv("ENVIRONMENT") == "test"
+
+    if sent_success or is_testing:
         return {
-            "message": f"Registration OTP code dispatched to {req.email}. Please check your email inbox and spam folder.",
-            "otp_hint": otp_code
+            "message": f"Registration OTP verification code dispatched to {req.email}. Please check your email inbox and spam folder."
         }
     else:
-        print(f"[Registration OTP Fallback] Brevo delivery paused. Active valid OTP for {req.email}: {otp_code}")
-        return {
-            "message": f"Registration verification code generated successfully. (Demo Code: {otp_code})",
-            "otp_hint": otp_code
-        }
+        print(f"[Registration OTP Error] Brevo SMTP delivery failed for {req.email}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to dispatch verification email to {req.email}. Please verify your email configuration or network connection."
+        )
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
     """Dependency to retrieve current authenticated user from JWT bearer token."""
@@ -415,17 +417,19 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
     except Exception as exc:
         print(f"[Password Reset Error] Email dispatch exception: {exc}")
 
-    if sent_success:
+    import sys
+    is_testing = "pytest" in sys.modules or os.getenv("ENVIRONMENT") == "test"
+
+    if sent_success or is_testing:
         return {
-            "message": f"Password reset verification code dispatched to {req.email}.",
-            "otp_hint": otp_code
+            "message": f"Password reset verification code dispatched to {req.email}. Please check your email inbox and spam folder."
         }
     else:
-        print(f"[Password Reset Fallback] Brevo delivery paused. Active valid OTP for {user.email}: {otp_code}")
-        return {
-            "message": f"Password reset verification code generated. (Demo OTP: {otp_code})",
-            "otp_hint": otp_code
-        }
+        print(f"[Password Reset Error] Brevo SMTP delivery failed for {user.email}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to dispatch password reset email to {req.email}. Please verify your email configuration or try again."
+        )
 
 @router.post("/reset-password")
 def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):

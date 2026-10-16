@@ -55,10 +55,9 @@ const LoginPage = () => {
     setForgotLoading(true);
     try {
       const res = await authAPI.forgotPassword(forgotEmail);
-      const msg = res.data?.message || 'Password reset OTP dispatched!';
-      const hint = res.data?.otp_hint ? ` (Demo OTP: ${res.data.otp_hint})` : '';
-      setToast({ message: msg + hint, type: 'success' });
-      if (res.data?.otp_hint) setResetOtp(res.data.otp_hint);
+      const msg = res.data?.message || 'Password reset OTP verification code dispatched to your email address!';
+      setToast({ message: msg, type: 'success' });
+      setResetOtp('');
       setForgotStep(2);
     } catch (err) {
       const errorMsg = err.response?.data?.detail || 'Failed to send OTP reset email. Please check email address.';
