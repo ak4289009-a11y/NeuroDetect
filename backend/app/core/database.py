@@ -19,7 +19,13 @@ else:
     engine_kwargs["max_overflow"] = 20
     engine_kwargs["pool_recycle"] = 300
 
-engine = create_engine(effective_db_url, **engine_kwargs)
+try:
+    engine = create_engine(effective_db_url, **engine_kwargs)
+except Exception as exc:
+    print(f"[Database Warning] Engine creation failed for '{effective_db_url}': {exc}. Falling back to SQLite.")
+    fallback_url = f"sqlite:///{settings.DEFAULT_DB_PATH}"
+    connect_args = {"check_same_thread": False}
+    engine = create_engine(fallback_url, connect_args=connect_args)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

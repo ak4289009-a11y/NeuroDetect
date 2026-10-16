@@ -29,14 +29,12 @@ class Settings(BaseSettings):
         url = (self.DATABASE_URL or "").strip()
         is_prod = (self.ENVIRONMENT.lower() in ["production", "prod"]) or (os.getenv("RENDER") is not None)
         
-        if is_prod and url and not url.startswith("sqlite"):
-            # Normalize postgres:// to postgresql:// for SQLAlchemy compatibility
+        if url and not url.startswith("sqlite"):
+            # Normalize postgres:// and postgresql:// to postgresql+psycopg2:// for SQLAlchemy 2.0 compatibility
             if url.startswith("postgres://"):
-                url = url.replace("postgres://", "postgresql://", 1)
-            return url
-        elif url and not url.startswith("sqlite"):
-            if url.startswith("postgres://"):
-                url = url.replace("postgres://", "postgresql://", 1)
+                url = url.replace("postgres://", "postgresql+psycopg2://", 1)
+            elif url.startswith("postgresql://") and not url.startswith("postgresql+"):
+                url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
             return url
         else:
             if is_prod:
