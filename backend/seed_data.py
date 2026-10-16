@@ -116,6 +116,7 @@ def seed_database():
 
         # 3. PATIENTS (10 Demo Indian Patients + 1 US Test Patient)
         patients_data = [
+            ("kumarrayshubham2005@gmail.com", "Patient@123456", "Shubham Kumar", 24, "Male", "+91 98765 43210", "New Delhi, Delhi, India"),
             ("patient@neurodetect.ai", "Patient@123456", "Ramesh Kumar", 45, "Male", "+91 98765 43210", "Sector 14, MG Road, New Delhi, Delhi"),
             ("priya.s@example.com", "Patient@123456", "Priya Sharma", 36, "Female", "+91 98123 45678", "Civil Lines, Jaipur, Rajasthan"),
             ("vance.a@example.com", "Patient@123456", "Alexander Vance", 52, "Male", "+1 (555) 456-7890", "450 Mission St, San Francisco, CA, USA"),

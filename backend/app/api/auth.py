@@ -77,10 +77,13 @@ def send_register_otp(req: RegisterOTPRequest, db: Session = Depends(get_db)):
             "message": f"Registration OTP verification code dispatched to {req.email}. Please check your email inbox and spam folder."
         }
     else:
-        print(f"[Registration OTP Error] Brevo SMTP delivery failed for {req.email}")
+        from app.services.email_service import get_last_email_error
+        last_err = get_last_email_error()
+        error_msg = last_err if last_err else f"Unable to dispatch verification email to {req.email}. Please verify your email configuration or network connection."
+        print(f"[Registration OTP Error] Delivery failed for {req.email}: {error_msg}")
         raise HTTPException(
             status_code=500,
-            detail=f"Unable to dispatch verification email to {req.email}. Please verify your email configuration or network connection."
+            detail=error_msg
         )
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
@@ -425,10 +428,13 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
             "message": f"Password reset verification code dispatched to {req.email}. Please check your email inbox and spam folder."
         }
     else:
-        print(f"[Password Reset Error] Brevo SMTP delivery failed for {user.email}")
+        from app.services.email_service import get_last_email_error
+        last_err = get_last_email_error()
+        error_msg = last_err if last_err else f"Unable to dispatch password reset email to {req.email}. Please verify your email configuration or try again."
+        print(f"[Password Reset Error] Delivery failed for {user.email}: {error_msg}")
         raise HTTPException(
             status_code=500,
-            detail=f"Unable to dispatch password reset email to {req.email}. Please verify your email configuration or try again."
+            detail=error_msg
         )
 
 @router.post("/reset-password")
