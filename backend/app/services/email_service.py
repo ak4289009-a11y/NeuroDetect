@@ -82,12 +82,20 @@ def send_brevo_smtp_email(to_email: str, subject: str, body_html: str) -> bool:
         return False
 
     try:
+        import email.utils
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
         msg["From"] = f"{sender_name} <{sender_email}>"
         msg["To"] = to_email.strip()
-        html_part = MIMEText(body_html, "html")
-        msg.attach(html_part)
+        msg["Reply-To"] = sender_email
+        msg["Date"] = email.utils.formatdate(localtime=True)
+        msg["Message-ID"] = email.utils.make_msgid(domain="smtp-brevo.com")
+
+        # Dual plain-text + HTML format prevents mail servers from classifying as spam
+        plain_text = re.sub(r"<[^>]+>", " ", body_html).strip()
+        plain_text = re.sub(r"\s+", " ", plain_text)
+        msg.attach(MIMEText(plain_text, "plain", "utf-8"))
+        msg.attach(MIMEText(body_html, "html", "utf-8"))
 
         # 1. Try STARTTLS on Port 587 and Port 2525
         for port in [587, 2525]:
