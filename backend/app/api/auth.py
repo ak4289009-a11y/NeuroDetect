@@ -313,7 +313,8 @@ async def register_doctor(
 @router.post("/login", response_model=Token)
 def login(login_req: LoginRequest, db: Session = Depends(get_db)):
     """Authenticates Patient, Doctor, or Admin user with role verification."""
-    user = db.query(User).filter(User.email == login_req.email).first()
+    clean_email = (login_req.email or "").strip().lower()
+    user = db.query(User).filter(func.lower(User.email) == clean_email).first()
     if not user or not verify_password(login_req.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password.")
         

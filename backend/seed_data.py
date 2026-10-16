@@ -2,6 +2,7 @@ import os
 import cv2
 import numpy as np
 from datetime import datetime, timedelta
+from sqlalchemy import func
 from app.core.database import SessionLocal, engine, Base
 from app.core.security import get_password_hash
 from app.core.config import settings
@@ -50,7 +51,7 @@ def seed_database():
 
         # 1. ADMIN USER
         admin_email = "admin@neurodetect.ai"
-        admin_user = db.query(User).filter(User.email == admin_email).first()
+        admin_user = db.query(User).filter(func.lower(User.email) == admin_email).first()
         if not admin_user:
             admin_user = User(
                 email=admin_email,
@@ -61,6 +62,10 @@ def seed_database():
             db.add(admin_user)
             db.commit()
             db.refresh(admin_user)
+        else:
+            admin_user.hashed_password = get_password_hash("Admin@123456")
+            admin_user.is_active = True
+            db.commit()
 
         # 2. DOCTORS BY INDIA-WIDE LOCATION
         doctors_data = [
@@ -83,7 +88,8 @@ def seed_database():
         created_doctors = []
         for doc_tuple in doctors_data:
             email, pwd, name, spec, hosp, city, loc, reg, exp, is_appr = doc_tuple
-            d_user = db.query(User).filter(User.email == email).first()
+            clean_d = email.strip().lower()
+            d_user = db.query(User).filter(func.lower(User.email) == clean_d).first()
             if not d_user:
                 d_user = User(
                     email=email,
@@ -112,6 +118,9 @@ def seed_database():
                 db.refresh(doc)
                 created_doctors.append(doc)
             else:
+                d_user.hashed_password = get_password_hash(pwd)
+                d_user.is_active = True
+                db.commit()
                 created_doctors.append(d_user.doctor_profile)
 
         # 3. PATIENTS (10 Demo Indian Patients + 1 US Test Patient)
@@ -132,7 +141,8 @@ def seed_database():
 
         patients_list = []
         for email, pwd, name, age, gender, phone, addr in patients_data:
-            p_user = db.query(User).filter(User.email == email).first()
+            clean_e = email.strip().lower()
+            p_user = db.query(User).filter(func.lower(User.email) == clean_e).first()
             if not p_user:
                 p_user = User(
                     email=email,
@@ -157,6 +167,10 @@ def seed_database():
                 db.refresh(pat)
                 patients_list.append(pat)
             else:
+                if clean_e in ["kumarrayshubham2005@gmail.com", "patient@neurodetect.ai"]:
+                    p_user.hashed_password = get_password_hash(pwd)
+                    p_user.is_active = True
+                    db.commit()
                 patients_list.append(p_user.patient_profile)
 
         # 4. MRI SCANS & AI REPORTS GENERATION (At least 5 Historical Scans per Patient)
