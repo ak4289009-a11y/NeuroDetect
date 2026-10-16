@@ -1,4 +1,4 @@
-// B.Tech Final Year CSE Project - Doctor Clinical Dashboard
+// NeuroDetect Clinical AI - Doctor Clinical Dashboard
 // Dedicated workstation for Neurologists to review pending MRI scans, inspect patient history, analyze diagnostic metrics, and issue clinical reports
 
 import React, { useState, useEffect } from 'react';

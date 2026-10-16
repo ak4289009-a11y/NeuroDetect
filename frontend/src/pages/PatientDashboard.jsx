@@ -1,4 +1,4 @@
-// B.Tech Final Year CSE Project - Patient Dashboard Component
+// NeuroDetect Clinical AI - Patient Dashboard Component
 // Handles patient MRI uploads, PDF report downloads, Doctor Selection by Location, Diet Plans, Videos, FAQs, and Contact Support
 
 import React, { useState, useEffect } from 'react';

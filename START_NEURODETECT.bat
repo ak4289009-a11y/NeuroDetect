@@ -3,10 +3,9 @@ TITLE NeuroDetect - Clinical AI Diagnostic Suite Launcher
 COLOR 0B
 CLS
 echo ===============================================================================
-echo            NEURODETECT: BRAIN TUMOR CAD SYSTEM (MCA MAJOR PROJECT)
-echo            Student: Anuradha Kumari ^| Enrolment No: 2353902714
-echo            Course: MCSP-232 (MCA_NEW) ^| Guide: Mr. Rafi Anwar
-echo            IGNOU Study Centre 4600 ^| Regional Centre: Darbhanga (46)
+echo            NEURODETECT: BRAIN TUMOR CLINICAL DIAGNOSTIC SYSTEM
+echo            Clinical-Grade Deep Learning Decision Support Platform
+echo            DenseNet-121 Architecture ^& Explainable Grad-CAM Visualizer
 echo ===============================================================================
 echo.
 echo [1/3] Checking Python 3 Environment...

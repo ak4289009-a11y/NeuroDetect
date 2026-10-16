@@ -1,4 +1,4 @@
-// B.Tech Final Year CSE Project - NeuroDetect System
+// NeuroDetect Clinical AI - Hero Section Component
 // Hero section component with asymmetrical 2-column layout
 
 import React from 'react';

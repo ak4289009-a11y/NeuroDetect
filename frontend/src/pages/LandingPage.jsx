@@ -1,4 +1,4 @@
-// B.Tech / MCA Final Year CSE Project - NeuroDetect Landing Page
+// NeuroDetect Clinical AI - Healthcare Landing Page
 // Main landing page with Features, About, Doctors, Interactive FAQ, and Contact sections
 
 import React, { useState, useEffect } from 'react';
@@ -219,7 +219,7 @@ const LandingPage = () => {
               NeuroDetect Research & Architecture
             </h2>
             <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
-              NeuroDetect was developed as a comprehensive Final Year Major Project in Computer Science & Engineering. It integrates modern transfer learning with computer vision to assist healthcare institutions in rapid axial brain MRI tumor detection.
+              NeuroDetect is an advanced clinical AI diagnostic platform engineered for healthcare institutions and neuro-radiology departments. It integrates deep transfer learning with computer vision to assist medical professionals in rapid, high-precision axial brain MRI tumor detection.
             </p>
           </div>
 
@@ -409,7 +409,7 @@ const LandingPage = () => {
             {/* Right Form Column */}
             <div className="lg:col-span-7 bg-white border border-gray-200 rounded-xl p-6 sm:p-8 shadow-sm">
               <h3 className="font-bold text-base text-gray-900 mb-1">Send Us a Direct Message</h3>
-              <p className="text-xs text-gray-500 mb-6">Our academic evaluation & support desk will respond shortly.</p>
+              <p className="text-xs text-gray-500 mb-6">Our clinical support and technical assistance desk will respond shortly.</p>
 
               <form onSubmit={handleContactSubmit} className="space-y-4 text-xs">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

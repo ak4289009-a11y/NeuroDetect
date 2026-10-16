@@ -8,8 +8,8 @@ DOCUMENTATION_DATABASE = {
         "title": "DenseNet121 Deep Learning Model Specification",
         "subtitle": "High-Precision Transfer Learning Architecture for 4-Class Brain Tumor Diagnosis",
         "category": "Deep Learning & Model Architecture",
-        "author": "Department of Computer Science & Engineering • NIT",
-        "version": "v1.4 - Academic Release 2026",
+        "author": "NeuroDetect Clinical AI Research Group",
+        "version": "v1.4 - Clinical Release 2026",
         "metrics": [
             {"label": "Model Accuracy", "value": "95.8%", "color": "#2563eb"},
             {"label": "Input Tensor", "value": "224 × 224 × 3", "color": "#7c3aed"},
@@ -71,8 +71,8 @@ DOCUMENTATION_DATABASE = {
         "title": "Grad-CAM Spatial Explainability Heatmap Specification",
         "subtitle": "Visualizing Neural Network Decision Regions on Brain MRI Scans",
         "category": "Explainable AI (XAI) & Computer Vision",
-        "author": "Department of Computer Science & Engineering • NIT",
-        "version": "v1.4 - Academic Release 2026",
+        "author": "NeuroDetect Clinical AI Research Group",
+        "version": "v1.4 - Clinical Release 2026",
         "metrics": [
             {"label": "Explainability", "value": "Grad-CAM XAI", "color": "#2563eb"},
             {"label": "Target Layer", "value": "Conv_5_block", "color": "#7c3aed"},
@@ -134,8 +134,8 @@ DOCUMENTATION_DATABASE = {
         "title": "Two-Tier Doctor Validation Workflow Specification",
         "subtitle": "Human-in-the-Loop Clinical Verification Protocol for Patient Safety",
         "category": "Healthcare Clinical Workflows",
-        "author": "Department of Computer Science & Engineering • NIT",
-        "version": "v1.4 - Academic Release 2026",
+        "author": "NeuroDetect Clinical AI Research Group",
+        "version": "v1.4 - Clinical Release 2026",
         "metrics": [
             {"label": "Workflow Model", "value": "Human-in-Loop", "color": "#2563eb"},
             {"label": "Routing", "value": "By City / Location", "color": "#7c3aed"},
@@ -197,8 +197,8 @@ DOCUMENTATION_DATABASE = {
         "title": "ReportLab Medical PDF Generation Engine Specification",
         "subtitle": "Automated Dynamic Healthcare Document Generator Architecture",
         "category": "Backend Systems & Document Engineering",
-        "author": "Department of Computer Science & Engineering • NIT",
-        "version": "v1.4 - Academic Release 2026",
+        "author": "NeuroDetect Clinical AI Research Group",
+        "version": "v1.4 - Clinical Release 2026",
         "metrics": [
             {"label": "PDF Engine", "value": "ReportLab Platypus", "color": "#2563eb"},
             {"label": "Resolution", "value": "High-Res Embed", "color": "#7c3aed"},
@@ -535,7 +535,7 @@ def view_document_html(doc_key: str):
 
         <!-- Footer Actions -->
         <div class="action-footer">
-            <span>© 2026 NeuroDetect Project Team • Department of Computer Science & Engineering</span>
+            <span>© 2026 NeuroDetect Clinical AI Systems • Medical Decision Support Research Group</span>
             <button class="btn-action" onclick="window.print()">🖨️ Print / Export PDF Paper</button>
         </div>
 

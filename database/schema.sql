@@ -1,11 +1,6 @@
 -- ================================================================================
 -- NEURODETECT: BRAIN TUMOR CAD CLINICAL DECISION SUPPORT SYSTEM
--- Master of Computer Applications (MCA_NEW) — Course Code: MCSP-232
--- Indira Gandhi National Open University (IGNOU)
--- Candidate: Anuradha Kumari (Enrolment No: 2353902714)
--- Study Centre: IGNOU Study Centre 4600 | Regional Centre: Darbhanga (RC Code: 46)
--- Guide: Mr. Rafi Anwar (SOCIS, IGNOU)
---
+-- Clinical Intelligence & Neuro-Radiology Image Analytics Platform
 -- Relational Database Schema Definition (Third Normal Form - 3NF)
 -- Compatible with SQLite, PostgreSQL, and MySQL / MariaDB
 -- ================================================================================

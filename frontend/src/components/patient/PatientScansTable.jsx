@@ -1,4 +1,4 @@
-// B.Tech Final Year CSE Project
+// NeuroDetect Clinical AI - Patient Scans Table
 // Patient MRI scan history HTML table component
 
 import React from 'react';

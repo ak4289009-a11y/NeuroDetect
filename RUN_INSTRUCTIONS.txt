@@ -1,12 +1,6 @@
 ================================================================================
-NEURODETECT: BRAIN TUMOR DETECTION SYSTEM (MCA MAJOR PROJECT)
-Indira Gandhi National Open University (IGNOU)
-Student: Anuradha Kumari (Enrolment No: 2353902714)
-Programme: Master of Computer Applications (MCA_NEW)
-Course Code: MCSP-232 (Major Project Work)
-Guide: Mr. Rafi Anwar (SOCIS, IGNOU)
-Study Centre: IGNOU Study Centre 4600
-Regional Centre: IGNOU Regional Centre, Darbhanga (RC Code: 46)
+NEURODETECT: BRAIN TUMOR CLINICAL CAD SYSTEM
+AI-Powered Deep Learning Neuro-Radiology Platform
 ================================================================================
 
 HOW TO RUN THE APPLICATION:

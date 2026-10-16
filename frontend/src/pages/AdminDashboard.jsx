@@ -1,4 +1,4 @@
-// B.Tech Final Year CSE Project - Admin Management Dashboard
+// NeuroDetect Clinical AI - Admin Management Dashboard
 // Handles Doctor Approvals, Patient Management, Report Audit, FAQ & Video CMS, and System Settings
 
 import React, { useState, useEffect } from 'react';
@@ -268,7 +268,7 @@ const AdminDashboard = () => {
             <div className="space-y-5">
               <div>
                 <h1 className="text-xl font-bold text-gray-900">Admin Management Panel</h1>
-                <p className="text-xs text-gray-500">Academic Project Administration & User Controls</p>
+                <p className="text-xs text-gray-500">Clinical System Administration & User Controls</p>
               </div>
 
               {/* Summary Metrics */}

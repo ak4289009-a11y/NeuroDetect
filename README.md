@@ -1,19 +1,12 @@
-# NeuroDetect: Brain Tumor Detection System
-### Master of Computer Applications (MCA_NEW) — Major Project (MCSP-232)
-### Indira Gandhi National Open University (IGNOU)
+# NeuroDetect: Brain Tumor Clinical AI Detection System
 
 ---
 
-### Project Information
-- **Project Title**: NEURODETECT: AN EXPLAINABLE DEEP LEARNING CLINICAL DECISION SUPPORT SYSTEM FOR MRI BRAIN TUMOR ANALYSIS USING DENSENET-121 AND GRAD-CAM SALIENCY MAPPING
-- **Student Name**: Anuradha Kumari
-- **Enrolment Number**: 2353902714
-- **Programme**: Master of Computer Applications (MCA_NEW)
-- **Course Code**: MCSP-232 (Major Project Work)
-- **Project Guide**: Mr. Rafi Anwar (Assistant Professor / Academic Counselor, SOCIS, IGNOU)
-- **Study Centre**: IGNOU Study Centre 4600
-- **Regional Centre**: IGNOU Regional Centre, Darbhanga (RC Code: 46)
-- **Academic Year**: 2026
+### Platform Information
+- **System Title**: NEURODETECT: AN EXPLAINABLE DEEP LEARNING CLINICAL DECISION SUPPORT SYSTEM FOR MRI BRAIN TUMOR ANALYSIS USING DENSENET-121 AND GRAD-CAM SALIENCY MAPPING
+- **System Edition**: Enterprise Healthcare Clinical Decision Support Suite
+- **Core Technology**: DenseNet-121 CNN Architecture, Grad-CAM Saliency Maps, FastAPI, React
+- **Architecture**: Multi-Class Classification & Visual Explainability Platform
 
 ---
 

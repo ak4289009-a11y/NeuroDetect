@@ -1,4 +1,4 @@
-// NeuroDetect - B.Tech Final Year Project
+// NeuroDetect Clinical AI - Progress Bar Component
 // Progress bar component for file upload and AI prediction status
 
 import React from 'react';
