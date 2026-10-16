@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "NeuroDetect - AI Brain Tumor Detection"
-    VERSION: str = "1.0.1"
+    VERSION: str = "1.0.2"
     API_V1_STR: str = "/api/v1"
     
     # Secret Key for JWT
@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     BREVO_API_KEY: str = os.getenv("BREVO_API_KEY", "")
     BREVO_SENDER_EMAIL: str = os.getenv("BREVO_SENDER_EMAIL", os.getenv("EMAIL_FROM", "neyro390@gmail.com"))
     BREVO_SENDER_NAME: str = os.getenv("BREVO_SENDER_NAME", "NeuroDetect Medical Portal")
+    NEURODETECT_CONTACT_EMAIL: str = os.getenv("NEURODETECT_CONTACT_EMAIL", os.getenv("EMAIL_FROM", "neyro390@gmail.com"))
 
     # Supabase Private Storage Configuration
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
