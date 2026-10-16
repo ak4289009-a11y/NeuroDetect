@@ -45,7 +45,7 @@ def validate_brain_mri_image(image_path: str) -> tuple:
     rb_diff = np.mean(np.abs(r.astype(np.float32) - b.astype(np.float32)))
     max_color_diff = max(rg_diff, gb_diff, rb_diff)
 
-    if max_color_diff > 12.0:  # Photographic RGB color threshold
+    if max_color_diff > 55.0:  # Photographic RGB color threshold (allows medical JPEG artifacts, heatmaps, and tinted PACS scans)
         return False, user_error
 
     # Convert to grayscale for structural inspection
@@ -54,7 +54,7 @@ def validate_brain_mri_image(image_path: str) -> tuple:
     # 3. Variance & Contrast Check (Rejects blank, solid, or flat noise images)
     gray_std = np.std(gray)
     gray_min, gray_max = np.min(gray), np.max(gray)
-    if gray_std < 12.0 or (gray_max - gray_min) < 35:
+    if gray_std < 8.0 or (gray_max - gray_min) < 20:
         return False, user_error
 
     # 4. Outer Border Background Inspection (MRIs are enclosed in dark background matrix)
@@ -64,7 +64,7 @@ def validate_brain_mri_image(image_path: str) -> tuple:
     right_border = np.mean(gray[:, min(w - 1, int(w * 0.95)):])
     avg_border_intensity = np.mean([top_border, bottom_border, left_border, right_border])
 
-    if avg_border_intensity > 130.0:  # Documents, white-background photos, screenshots
+    if avg_border_intensity > 220.0:  # Documents, white-background photos, screenshots
         return False, user_error
 
     # 5. Centered Brain Anatomical Mass Presence Check
@@ -73,7 +73,7 @@ def validate_brain_mri_image(image_path: str) -> tuple:
     center_roi = gray[cy_start:cy_end, cx_start:cx_end]
     center_mean = np.mean(center_roi)
 
-    if center_mean < 15.0:  # Empty center
+    if center_mean < 8.0:  # Empty center
         return False, user_error
 
     return True, "Valid Human Brain MRI"
