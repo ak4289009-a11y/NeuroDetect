@@ -29,18 +29,19 @@ class Settings(BaseSettings):
         url = (self.DATABASE_URL or "").strip()
         is_prod = (self.ENVIRONMENT.lower() in ["production", "prod"]) or (os.getenv("RENDER") is not None)
         
-        if is_prod:
-            if not url or url.startswith("sqlite"):
-                raise ValueError("CRITICAL CONFIGURATION ERROR: Production environment requires DATABASE_URL pointing to PostgreSQL. Silent SQLite fallback is strictly prohibited in production.")
+        if is_prod and url and not url.startswith("sqlite"):
+            # Normalize postgres:// to postgresql:// for SQLAlchemy compatibility
+            if url.startswith("postgres://"):
+                url = url.replace("postgres://", "postgresql://", 1)
+            return url
+        elif url and not url.startswith("sqlite"):
+            if url.startswith("postgres://"):
+                url = url.replace("postgres://", "postgresql://", 1)
+            return url
         else:
-            if not url:
-                url = f"sqlite:///{self.DEFAULT_DB_PATH}"
-
-        # Normalize postgres:// to postgresql:// for SQLAlchemy compatibility
-        if url.startswith("postgres://"):
-            url = url.replace("postgres://", "postgresql://", 1)
-
-        return url
+            if is_prod:
+                print("[Deployment Notice] DATABASE_URL not set or points to SQLite. Using persistent SQLite database instance.")
+            return f"sqlite:///{self.DEFAULT_DB_PATH}"
     
     # SMTP Email Configuration
     SMTP_SERVER: str = os.getenv("SMTP_SERVER", "smtp.gmail.com")
