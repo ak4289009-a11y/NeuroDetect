@@ -58,6 +58,8 @@ const LoginPage = () => {
       const msg = res.data?.message || 'Password reset OTP verification code dispatched to your email address!';
       setToast({ message: msg, type: 'success' });
       setResetOtp('');
+      setNewPassword('');
+      setConfirmPassword('');
       setForgotStep(2);
     } catch (err) {
       const errorMsg = err.response?.data?.detail || 'Failed to send OTP reset email. Please check email address.';
@@ -273,18 +275,26 @@ const LoginPage = () => {
                 </button>
               </form>
             ) : (
-              <form onSubmit={handleResetPasswordSubmit} className="space-y-3">
+              <form onSubmit={handleResetPasswordSubmit} className="space-y-3" autoComplete="off">
                 <div>
                   <label className="block font-semibold text-gray-700 mb-1">6-Digit OTP Verification Code</label>
                   <input
                     type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    autoComplete="one-time-code"
+                    name="reset_otp_code_secure"
+                    id="reset_otp_code_secure"
                     required
                     maxLength={6}
                     placeholder="Enter 6-digit OTP code"
                     value={resetOtp}
-                    onChange={(e) => setResetOtp(e.target.value)}
+                    onChange={(e) => setResetOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     className="w-full p-2.5 bg-white border border-gray-200 rounded-lg text-xs font-mono font-bold tracking-widest text-center focus:ring-2 focus:ring-blue-600 focus:outline-none"
                   />
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    Check your email inbox ({forgotEmail}) for the 6-digit numeric OTP code.
+                  </p>
                 </div>
 
                 <div>
@@ -293,6 +303,9 @@ const LoginPage = () => {
                     <input
                       type={showNewPassword ? "text" : "password"}
                       required
+                      autoComplete="new-password"
+                      name="reset_new_password_field"
+                      id="reset_new_password_field"
                       placeholder="••••••••"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
@@ -316,6 +329,9 @@ const LoginPage = () => {
                     <input
                       type={showConfirmPassword ? "text" : "password"}
                       required
+                      autoComplete="new-password"
+                      name="reset_confirm_password_field"
+                      id="reset_confirm_password_field"
                       placeholder="••••••••"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}

@@ -443,16 +443,21 @@ const RegisterPage = () => {
               📧 An email containing a 6-digit verification code has been dispatched to <b>{pendingTargetEmail}</b>. Please open your email inbox (or Spam folder), copy the 6-digit code, and enter it below.
             </div>
 
-            <form onSubmit={handleFinalizeRegistration} className="space-y-4">
+            <form onSubmit={handleFinalizeRegistration} className="space-y-4" autoComplete="off">
               <div>
                 <label className="block font-semibold text-gray-700 mb-1">6-Digit Registration OTP Code</label>
                 <input
                   type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete="one-time-code"
+                  name="registration_otp_code_secure"
+                  id="registration_otp_code_secure"
                   required
                   maxLength={6}
                   placeholder="Enter 6-digit OTP code"
                   value={registerOtp}
-                  onChange={(e) => setRegisterOtp(e.target.value)}
+                  onChange={(e) => setRegisterOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   className="w-full p-2.5 bg-white border border-gray-200 rounded-lg text-xs font-mono font-bold tracking-widest text-center focus:ring-2 focus:ring-blue-600 focus:outline-none"
                 />
               </div>
