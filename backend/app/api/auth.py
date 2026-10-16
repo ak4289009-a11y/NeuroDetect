@@ -18,6 +18,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
 
 @router.post("/send-register-otp")
+@router.post("/request-otp")
 def send_register_otp(req: RegisterOTPRequest, db: Session = Depends(get_db)):
     """
     Generates a 6-digit OTP code for new user registration and saves it to PostgreSQL DB.
