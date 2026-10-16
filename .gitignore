@@ -20,8 +20,6 @@ reports/
 
 # Node / Frontend
 node_modules/
-dist/
-.dist/
 .vite/
 
 # IDE & System

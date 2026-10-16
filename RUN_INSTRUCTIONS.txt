@@ -2,8 +2,11 @@
 NEURODETECT: BRAIN TUMOR DETECTION SYSTEM (MCA MAJOR PROJECT)
 Indira Gandhi National Open University (IGNOU)
 Student: Anuradha Kumari (Enrolment No: 2353902714)
+Programme: Master of Computer Applications (MCA_NEW)
+Course Code: MCSP-232 (Major Project Work)
 Guide: Mr. Rafi Anwar (SOCIS, IGNOU)
-Course: MCSP-232 / BCSP-064
+Study Centre: IGNOU Study Centre 4600
+Regional Centre: IGNOU Regional Centre, Darbhanga (RC Code: 46)
 ================================================================================
 
 HOW TO RUN THE APPLICATION:
@@ -13,7 +16,7 @@ HOW TO RUN THE APPLICATION:
    http://127.0.0.1:8000
 
 (Note: Node.js is NOT required. The React frontend is already compiled into
-backend distribution and served directly by the Python application server.)
+production distribution and served directly by the Python application server.)
 
 
 LOGIN CREDENTIALS FOR TESTING:
@@ -24,7 +27,7 @@ LOGIN CREDENTIALS FOR TESTING:
    - Access:   Upload MRI scans, view diagnosis, download PDF reports
 
 2. Doctor Account:
-   - Email:    dr.rajesh@neurodetect.ai
+   - Email:    dr.rajesh@neurodetect.ai  (or dr.smith@neurodetect.ai)
    - Password:  Doctor@123456
    - Access:   Review patient scans, confirm diagnosis, clinical sign-off
 
@@ -32,6 +35,13 @@ LOGIN CREDENTIALS FOR TESTING:
    - Email:    admin@neurodetect.ai
    - Password:  Admin@123456
    - Access:   Approve doctor registrations, view users and audit logs
+
+
+1-CLICK VIVA DEMO SHORTCUTS:
+---------------------------
+- Patient Portal:  http://127.0.0.1:8000/quick-login/patient
+- Doctor Portal:   http://127.0.0.1:8000/quick-login/doctor
+- Admin Portal:    http://127.0.0.1:8000/quick-login/admin
 
 
 TEST MRI SCANS FOR DEMONSTRATION:

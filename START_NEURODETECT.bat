@@ -5,7 +5,8 @@ CLS
 echo ===============================================================================
 echo            NEURODETECT: BRAIN TUMOR CAD SYSTEM (MCA MAJOR PROJECT)
 echo            Student: Anuradha Kumari ^| Enrolment No: 2353902714
-echo            Guide: Mr. Rafi Anwar ^| Course: MCSP-232 / BCSP-064
+echo            Course: MCSP-232 (MCA_NEW) ^| Guide: Mr. Rafi Anwar
+echo            IGNOU Study Centre 4600 ^| Regional Centre: Darbhanga (46)
 echo ===============================================================================
 echo.
 echo [1/3] Checking Python 3 Environment...
@@ -36,13 +37,13 @@ echo.
 echo -------------------------------------------------------------------------------
 echo Application will be available at: http://127.0.0.1:8000
 echo Direct 1-Click Role Login URLs (For Viva-Voce Demonstration):
-echo   * Patient Portal:  http://127.0.0.1:8000/dev-login/patient
-echo   * Doctor Portal:   http://127.0.0.1:8000/dev-login/doctor
-echo   * Admin Panel:     http://127.0.0.1:8000/dev-login/admin
+echo   * Patient Portal:  http://127.0.0.1:8000/quick-login/patient
+echo   * Doctor Portal:   http://127.0.0.1:8000/quick-login/doctor
+echo   * Admin Panel:     http://127.0.0.1:8000/quick-login/admin
 echo.
 echo Login Credentials:
 echo   * Patient:  patient@neurodetect.ai   /  Patient@123456
-echo   * Doctor:   dr.rajesh@neurodetect.ai /  Doctor@123456
+echo   * Doctor:   dr.rajesh@neurodetect.ai /  Doctor@123456  (or dr.smith@neurodetect.ai)
 echo   * Admin:    admin@neurodetect.ai     /  Admin@123456
 echo -------------------------------------------------------------------------------
 echo Opening default web browser in 3 seconds...

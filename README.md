@@ -1,18 +1,18 @@
 # NeuroDetect: Brain Tumor Detection System
-### Master of Computer Applications (MCA) — Major Project (MCSP-232 / BCSP-064)
+### Master of Computer Applications (MCA_NEW) — Major Project (MCSP-232)
 ### Indira Gandhi National Open University (IGNOU)
 
 ---
 
 ### Project Information
-- **Project Title**: NeuroDetect: Explainable AI & Deep Learning Computer-Aided Diagnostic System for Brain Tumor Detection
+- **Project Title**: NEURODETECT: AN EXPLAINABLE DEEP LEARNING CLINICAL DECISION SUPPORT SYSTEM FOR MRI BRAIN TUMOR ANALYSIS USING DENSENET-121 AND GRAD-CAM SALIENCY MAPPING
 - **Student Name**: Anuradha Kumari
 - **Enrolment Number**: 2353902714
-- **Programme**: Master of Computer Applications (MCA)
-- **Course Code**: MCSP-232 / BCSP-064
-- **Project Guide**: Mr. Rafi Anwar (Assistant Professor, SOCIS, IGNOU)
-- **Study Centre**: AN College, Patna (SC Code: 0501)
-- **Regional Centre**: Patna (RC Code: 05)
+- **Programme**: Master of Computer Applications (MCA_NEW)
+- **Course Code**: MCSP-232 (Major Project Work)
+- **Project Guide**: Mr. Rafi Anwar (Assistant Professor / Academic Counselor, SOCIS, IGNOU)
+- **Study Centre**: IGNOU Study Centre 4600
+- **Regional Centre**: IGNOU Regional Centre, Darbhanga (RC Code: 46)
 - **Academic Year**: 2026
 
 ---
@@ -117,7 +117,7 @@ The database is pre-seeded with accounts for all three roles:
 | Role | Email Address | Password | Access Privileges |
 | :--- | :--- | :--- | :--- |
 | **Patient** | `patient@neurodetect.ai` | `Patient@123456` | Upload scans, view AI results, download PDF reports, book appointments |
-| **Doctor** | `dr.rajesh@neurodetect.ai` | `Doctor@123456` | Review unverified scans, view Grad-CAM heatmaps, approve reports |
+| **Doctor** | `dr.rajesh@neurodetect.ai`<br>*(also `dr.smith@neurodetect.ai`)* | `Doctor@123456` | Review unverified scans, view Grad-CAM heatmaps, approve reports |
 | **Administrator** | `admin@neurodetect.ai` | `Admin@123456` | Approve/reject doctor registrations, view user accounts, view audit logs |
 
 > **Viva Demo Shortcut**: For rapid demonstration during the viva-voce examination, one-click login links are available:

@@ -156,7 +156,7 @@ const LoginPage = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={
-                  role === 'ADMIN' ? 'admin@neurodetect.ai' : role === 'DOCTOR' ? 'dr.smith@neurodetect.ai' : 'patient@neurodetect.ai'
+                  role === 'ADMIN' ? 'admin@neurodetect.ai' : role === 'DOCTOR' ? 'dr.rajesh@neurodetect.ai' : 'patient@neurodetect.ai'
                 }
                 className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-600 focus:outline-none"
               />
