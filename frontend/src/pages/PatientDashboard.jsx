@@ -370,7 +370,7 @@ const PatientDashboard = () => {
                             <div className="flex items-center gap-2">
                               <Stethoscope className="w-4 h-4 text-blue-600" />
                               <span className="font-bold text-sm text-gray-900">
-                                Dr. {review.doctor?.name || 'Rajesh Kumar'} ({review.doctor?.specialization || 'Senior Neuro-Oncologist'})
+                                {review.doctor?.name ? (review.doctor.name.startsWith('Dr.') ? review.doctor.name : `Dr. ${review.doctor.name}`) : 'Assigned Specialist'} {review.doctor?.specialization ? `(${review.doctor.specialization})` : ''}
                               </span>
                             </div>
                             <span className="text-gray-500">Reviewed: {new Date(review.reviewed_at).toLocaleDateString()}</span>

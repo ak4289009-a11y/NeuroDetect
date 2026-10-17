@@ -324,7 +324,7 @@ const MriUploadBox = ({ onScanComplete, setToastMessage }) => {
             <div>
               <p className="text-gray-600">Assigned Neurologist:</p>
               <p className="font-bold text-gray-900">
-                {doctorsList.find(d => String(d.id) === String(selectedDoctorId))?.name || 'Dr. Rajesh Kumar'}
+                {predictionOutput.preferred_doctor?.name || doctorsList.find(d => String(d.id) === String(selectedDoctorId))?.name || 'Assigned Specialist'}
               </p>
             </div>
           </div>

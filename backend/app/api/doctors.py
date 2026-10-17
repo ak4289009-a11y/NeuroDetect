@@ -308,10 +308,6 @@ def get_doctor_appointments(
         patient = a.patient
         if not patient:
             continue
-        phone = (patient.phone or "").strip()
-        addr = (patient.address or "").strip().lower()
-        if phone.startswith("+1") or "usa" in addr or "boston" in addr:
-            continue
 
         latest_scan = db.query(MRIScan).filter(
             MRIScan.patient_id == patient.id
@@ -357,10 +353,10 @@ def book_patient_appointment(
         patient = Patient(
             user_id=current_user.id,
             name=current_user.email.split("@")[0].replace(".", " ").title(),
-            age=35,
-            gender="Male",
-            phone="+91 98765 43210",
-            address="New Delhi, India"
+            age=None,
+            gender=None,
+            phone=None,
+            address=None
         )
         db.add(patient)
         db.commit()
@@ -372,7 +368,6 @@ def book_patient_appointment(
     ).first()
 
     if not doctor:
-        # Fallback to any approved doctor if exact match wasn't found
         doctor = db.query(Doctor).filter(Doctor.id == appt_in.doctor_id).first()
         if doctor and not doctor.is_approved:
             doctor.is_approved = True
@@ -380,10 +375,12 @@ def book_patient_appointment(
             db.refresh(doctor)
 
     if not doctor:
-        doctor = db.query(Doctor).filter(Doctor.is_approved == True).first()
+        raise HTTPException(status_code=404, detail="Selected doctor was not found or is unavailable.")
 
-    if not doctor:
-        raise HTTPException(status_code=404, detail="Selected doctor is not available for appointments.")
+    # Assign doctor to patient if not already set
+    if not patient.assigned_doctor_id:
+        patient.assigned_doctor_id = doctor.id
+        db.commit()
 
     if appt_in.appointment_date < datetime.utcnow() - timedelta(hours=24):
         raise HTTPException(status_code=400, detail="Appointment date and time must be in the future.")
