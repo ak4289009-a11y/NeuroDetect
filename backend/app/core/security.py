@@ -7,17 +7,27 @@ from app.core.config import settings
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plain password against a bcrypt hashed password string."""
     try:
-        if isinstance(plain_password, str):
-            pwd_bytes = plain_password.encode('utf-8')[:72]
-        else:
-            pwd_bytes = plain_password[:72]
+        if not plain_password or not hashed_password:
+            return False
 
         if isinstance(hashed_password, str):
-            hash_bytes = hashed_password.encode('utf-8')
+            hash_bytes = hashed_password.strip().encode('utf-8')
         else:
             hash_bytes = hashed_password
 
-        return bcrypt.checkpw(pwd_bytes, hash_bytes)
+        # Test original and trimmed candidate passwords to protect against accidental copy-paste whitespace
+        candidates = [plain_password]
+        if isinstance(plain_password, str):
+            trimmed = plain_password.strip()
+            if trimmed != plain_password and trimmed:
+                candidates.append(trimmed)
+
+        for cand in candidates:
+            pwd_bytes = cand.encode('utf-8')[:72] if isinstance(cand, str) else cand[:72]
+            if bcrypt.checkpw(pwd_bytes, hash_bytes):
+                return True
+
+        return False
     except Exception as e:
         print(f"[Security Warning] Password verification error: {e}")
         return False

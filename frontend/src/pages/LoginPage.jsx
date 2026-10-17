@@ -33,14 +33,15 @@ const LoginPage = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const data = await login(email, password, role);
-      setToast({ message: `Welcome back, ${data.name}!`, type: 'success' });
+      const cleanEmail = email.trim();
+      const data = await login(cleanEmail, password, role);
+      setToast({ message: `Welcome back, ${data.name}! Redirecting to ${data.role} dashboard...`, type: 'success' });
       
       setTimeout(() => {
         if (data.role === 'ADMIN') navigate('/admin');
         else if (data.role === 'DOCTOR') navigate('/doctor');
         else navigate('/patient');
-      }, 800);
+      }, 700);
     } catch (err) {
       const errorMsg = err.response?.data?.detail || 'Authentication failed. Please check credentials.';
       setToast({ message: errorMsg, type: 'error' });
@@ -141,6 +142,49 @@ const LoginPage = () => {
               </button>
             );
           })}
+        </div>
+
+        {/* 1-Click Demo Fill for Viva & Evaluation */}
+        <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-2.5 space-y-1.5">
+          <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700">
+            <span>⚡ Demo Accounts</span>
+            <span className="text-[10px] text-blue-600 font-normal">Click to auto-fill</span>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                setRole('PATIENT');
+                setEmail('patient@neurodetect.ai');
+                setPassword('Patient@123456');
+              }}
+              className="py-1 px-2 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded text-[11px] font-medium text-slate-700 hover:text-blue-700 transition-all text-center shadow-xs"
+            >
+              👤 Patient
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setRole('DOCTOR');
+                setEmail('dr.rajesh@neurodetect.ai');
+                setPassword('Doctor@123456');
+              }}
+              className="py-1 px-2 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded text-[11px] font-medium text-slate-700 hover:text-blue-700 transition-all text-center shadow-xs"
+            >
+              🩺 Doctor
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setRole('ADMIN');
+                setEmail('admin@neurodetect.ai');
+                setPassword('Admin@123456');
+              }}
+              className="py-1 px-2 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded text-[11px] font-medium text-slate-700 hover:text-blue-700 transition-all text-center shadow-xs"
+            >
+              🛡️ Admin
+            </button>
+          </div>
         </div>
 
         {/* Form */}
