@@ -53,6 +53,7 @@ class PatientRegister(BaseModel):
 class PatientOut(BaseModel):
     id: int
     user_id: int
+    assigned_doctor_id: Optional[int] = None
     name: str
     age: int
     gender: str

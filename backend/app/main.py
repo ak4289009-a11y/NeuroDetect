@@ -24,7 +24,21 @@ from sqlalchemy import text
 Base.metadata.create_all(bind=engine)
 try:
     with engine.connect() as conn:
-        conn.execute(text("ALTER TABLE patients ADD COLUMN IF NOT EXISTS medical_history TEXT;"))
+        try:
+            conn.execute(text("ALTER TABLE patients ADD COLUMN IF NOT EXISTS medical_history TEXT;"))
+        except Exception:
+            try:
+                conn.execute(text("ALTER TABLE patients ADD COLUMN medical_history TEXT;"))
+            except Exception:
+                pass
+
+        try:
+            conn.execute(text("ALTER TABLE patients ADD COLUMN IF NOT EXISTS assigned_doctor_id INTEGER;"))
+        except Exception:
+            try:
+                conn.execute(text("ALTER TABLE patients ADD COLUMN assigned_doctor_id INTEGER;"))
+            except Exception:
+                pass
         conn.commit()
 except Exception:
     pass

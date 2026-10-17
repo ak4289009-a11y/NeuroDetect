@@ -43,6 +43,7 @@ class Patient(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    assigned_doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=True)
     name = Column(String(255), nullable=False)
     age = Column(Integer, nullable=False)
     gender = Column(String(50), nullable=False)
@@ -51,6 +52,7 @@ class Patient(Base):
     medical_history = Column(Text, nullable=True)
 
     user = relationship("User", back_populates="patient_profile")
+    assigned_doctor = relationship("Doctor", foreign_keys=[assigned_doctor_id])
     scans = relationship("MRIScan", back_populates="patient", cascade="all, delete-orphan")
     appointments = relationship("Appointment", back_populates="patient", cascade="all, delete-orphan")
 

@@ -113,8 +113,8 @@ def seed_database():
             ("dr.deshmukh@neurodetect.ai", "Doctor@123456", "Dr. Sanjay Deshmukh", "Neurological Specialist", "KEM Hospital", "Pune", "Pune, MH, India", "MED-KEM-33211", 11, True),
             ("dr.baruah@neurodetect.ai", "Doctor@123456", "Dr. Pranab Baruah", "Consultant Neuroradiologist", "GNRC Hospital", "Guwahati", "Guwahati, Assam, India", "MED-GNRC-77441", 13, True),
             ("dr.dash@neurodetect.ai", "Doctor@123456", "Dr. Alok Dash", "Neuro-Oncology Director", "AMRI Hospital", "Bhubaneswar", "Bhubaneswar, Odisha, India", "MED-AMRI-55112", 19, True),
-            ("dr.sneha@neurodetect.ai", "Doctor@123456", "Dr. Sneha Verma", "Consultant Neuroradiologist", "Fortis Hospital", "Noida", "Noida, UP, India", "MED-FORTIS-88712", 8, False),
-            ("dr.alok@neurodetect.ai", "Doctor@123456", "Dr. Alok Nath", "Neurosurgeon", "Max Healthcare", "Gurgaon", "Gurgaon, HR, India", "MED-MAX-99124", 9, False)
+            ("dr.sneha@neurodetect.ai", "Doctor@123456", "Dr. Sneha Verma", "Consultant Neuroradiologist", "Fortis Hospital", "Noida", "Noida, UP, India", "MED-FORTIS-88712", 8, True),
+            ("dr.alok@neurodetect.ai", "Doctor@123456", "Dr. Alok Nath", "Neurosurgeon", "Max Healthcare", "Gurgaon", "Gurgaon, HR, India", "MED-MAX-99124", 9, True)
         ]
 
         created_doctors = []
@@ -217,14 +217,54 @@ def seed_database():
 
         # 4. MRI SCANS & AI REPORTS GENERATION (At least 5 Historical Scans per Patient)
         tumor_types = ["Glioma", "Meningioma", "Pituitary", "No Tumor"]
-        doc_rajesh = created_doctors[0]
+        # 4. PATIENT-DOCTOR SELECTION MAPPING & SCAN GENERATION
+        doc_map = {d.name: d for d in created_doctors if d}
+        dr_rajesh = doc_map.get("Dr. Rajesh Kumar") or created_doctors[0]
+        dr_smith = doc_map.get("Dr. Robert Smith") or (created_doctors[1] if len(created_doctors) > 1 else dr_rajesh)
+        dr_vikram = doc_map.get("Dr. Vikram Rao") or dr_rajesh
+        dr_ananya = doc_map.get("Dr. Ananya Sharma") or dr_smith
+        dr_sneha = doc_map.get("Dr. Sneha Verma") or dr_rajesh
 
+        # Dedicated Patient -> Selected Doctor dictionary
+        patient_doctor_rules = {
+            "patient@neurodetect.ai": dr_rajesh,
+            "amitav.roy@example.com": dr_rajesh,
+            "rajesh.prasad@example.com": dr_rajesh,
+            "ak4289009@gmail.com": dr_rajesh,
+            "priya.s@example.com": dr_smith,
+            "vance.a@example.com": dr_smith,
+            "sunita.b@example.com": dr_smith,
+            "deepak.v@example.com": dr_vikram,
+            "kavita.k@example.com": dr_vikram,
+            "biren.das@example.com": dr_ananya,
+            "archana.m@example.com": dr_ananya,
+            "suresh.m@example.com": dr_sneha,
+            "kumarrayshubham2005@gmail.com": dr_sneha,
+            "testuser99@example.com": dr_sneha
+        }
+
+        tumor_types = ["Glioma", "Meningioma", "Pituitary", "No Tumor"]
         all_db_patients = db.query(Patient).all()
         now = datetime.utcnow()
         for pat_idx, pat in enumerate(all_db_patients):
-            existing_scans = db.query(MRIScan).filter(MRIScan.patient_id == pat.id).count()
-            if existing_scans < 5:
-                needed = 5 - existing_scans
+            # Resolve selected doctor for this patient
+            p_email = pat.user.email.strip().lower() if pat.user else ""
+            selected_doc = patient_doctor_rules.get(p_email, created_doctors[pat_idx % len(created_doctors)])
+            
+            # Persist assigned primary neurologist on the Patient record
+            pat.assigned_doctor_id = selected_doc.id
+            db.commit()
+
+            # Ensure all existing scans for this patient are linked to the selected doctor
+            existing_patient_scans = db.query(MRIScan).filter(MRIScan.patient_id == pat.id).all()
+            for s in existing_patient_scans:
+                s.preferred_doctor_id = selected_doc.id
+            db.commit()
+
+            # Generate historical scans up to 5 if needed
+            existing_scans_count = len(existing_patient_scans)
+            if existing_scans_count < 5:
+                needed = 5 - existing_scans_count
                 for s_i in range(needed):
                     days_ago = (4 - s_i) * 30 + (pat_idx % 5) * 2
                     scan_date = now - timedelta(days=days_ago)
@@ -237,7 +277,7 @@ def seed_database():
 
                     scan = MRIScan(
                         patient_id=pat.id,
-                        preferred_doctor_id=doc_rajesh.id if pat.id <= 3 else None,
+                        preferred_doctor_id=selected_doc.id,
                         original_filename=f"Brain_MRI_Scan_PT{pat.id}_S{s_i+1}.png",
                         file_path=mri_rel_path,
                         upload_date=scan_date,
@@ -262,7 +302,7 @@ def seed_database():
                     if status == ScanStatus.APPROVED.value:
                         doc_rev = DoctorReview(
                             report_id=ai_rep.id,
-                            doctor_id=doc_rajesh.id,
+                            doctor_id=selected_doc.id,
                             clinical_notes=f"Clinical verification completed for {pat.name}. Scan findings indicate {t_type}.",
                             diagnosis=f"Verified {t_type}",
                             prescription="Follow recommended treatment plan and diet.",
@@ -274,6 +314,13 @@ def seed_database():
                         )
                         db.add(doc_rev)
                         db.commit()
+
+        # Update appointments to match each patient's selected doctor
+        all_appts = db.query(Appointment).all()
+        for appt in all_appts:
+            if appt.patient and appt.patient.assigned_doctor_id:
+                appt.doctor_id = appt.patient.assigned_doctor_id
+        db.commit()
 
         # 5. DIET PLANS
         diets_data = [

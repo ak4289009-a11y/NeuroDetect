@@ -63,9 +63,11 @@ def get_all_scans(
     db: Session = Depends(get_db)
 ):
     """
-    Retrieves all clinical MRI scans for doctors and administrators.
+    Retrieves clinical MRI scans:
+    - Admin: All scans across the hospital system.
+    - Doctor: ONLY scans belonging to patients who selected this doctor.
     """
-    return db.query(MRIScan).order_by(MRIScan.upload_date.desc()).all()
+    return get_authorized_scans(current_user, db)
 
 @router.get("/patient", response_model=List[MRIScanOut])
 def get_patient_scans(
@@ -140,9 +142,15 @@ async def upload_and_predict_mri(
 
     # Auto-assign an approved doctor if none explicitly selected by patient
     if not preferred_doctor_id:
-        assigned_doc = db.query(Doctor).filter(Doctor.is_approved == True).first()
-        if assigned_doc:
-            preferred_doctor_id = assigned_doc.id
+        if patient and getattr(patient, "assigned_doctor_id", None):
+            preferred_doctor_id = patient.assigned_doctor_id
+        else:
+            assigned_doc = db.query(Doctor).filter(Doctor.is_approved == True).first()
+            if assigned_doc:
+                preferred_doctor_id = assigned_doc.id
+
+    if patient and preferred_doctor_id:
+        patient.assigned_doctor_id = preferred_doctor_id
 
     mri_scan = MRIScan(
         patient_id=patient_id,

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.core.database import get_db
 from app.api.auth import require_role
-from app.core.authorization import verify_doctor_patient_access, get_authorized_scans
+from app.core.authorization import verify_doctor_patient_access, get_authorized_scans, get_authorized_patients
 from app.models.models import (
     User, Patient, Doctor, DoctorStatus, MRIScan, AIReport, ScanStatus, Message, DoctorReview, Appointment, ContactMessage
 )
@@ -51,36 +51,22 @@ def get_dashboard_summary_stats(
     elif current_user.role == "DOCTOR":
         auth_scans = get_authorized_scans_for_user(current_user, db)
         auth_scan_ids = [s.id for s in auth_scans]
+        auth_pats = get_authorized_patients(current_user, db)
         
-        # Total pending reviews in the clinical queue
-        total_pending = db.query(MRIScan).filter(
-            MRIScan.status.in_([ScanStatus.AI_COMPLETED.value, ScanStatus.UNDER_REVIEW.value])
-        ).count()
-
-        # Total completed clinical reports
-        total_approved = db.query(MRIScan).filter(
-            MRIScan.status == ScanStatus.APPROVED.value
-        ).count()
-
-        # Doctor direct queue
+        # Doctor direct queue metrics
         doc_pending = len([s for s in auth_scans if s.status in [ScanStatus.AI_COMPLETED.value, ScanStatus.UNDER_REVIEW.value]])
         doc_completed = len([s for s in auth_scans if s.status == ScanStatus.APPROVED.value])
 
-        pending_reviews = doc_pending if doc_pending > 0 else total_pending
-        completed_reports = doc_completed if doc_completed > 0 else total_approved
-
-        reports = db.query(AIReport).all()
+        reports = db.query(AIReport).filter(AIReport.scan_id.in_(auth_scan_ids)).all() if auth_scan_ids else []
         if reports:
             avg_confidence = sum(r.confidence for r in reports) / len(reports)
         else:
-            avg_confidence = 95.8
-
-        total_patients = db.query(Patient).count()
+            avg_confidence = 96.0
 
         return {
-            "todays_patients": total_patients,
-            "pending_reviews": pending_reviews,
-            "completed_reports": completed_reports,
+            "todays_patients": len(auth_pats),
+            "pending_reviews": doc_pending,
+            "completed_reports": doc_completed,
             "average_confidence": round(float(avg_confidence), 1)
         }
 

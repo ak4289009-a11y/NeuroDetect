@@ -113,32 +113,27 @@ def get_pending_scans_for_doctor(
 ):
     """
     Retrieves MRI scans awaiting doctor review in the clinical verification queue.
-    Prioritizes scans assigned to this doctor, followed by the general clinical triage queue.
+    Doctors ONLY see scans where the patient specifically selected this doctor (preferred_doctor_id == doctor.id).
+    Admins see all pending scans.
     """
-    doctor = current_user.doctor_profile if current_user.role == "DOCTOR" else None
-    doc_id = doctor.id if doctor else None
-
     pending_statuses = [ScanStatus.AI_COMPLETED.value, ScanStatus.UNDER_REVIEW.value]
-    
-    my_scans = []
-    if doc_id:
-        my_scans = db.query(MRIScan).filter(
-            MRIScan.preferred_doctor_id == doc_id,
+
+    if current_user.role == "ADMIN":
+        return db.query(MRIScan).filter(
             MRIScan.status.in_(pending_statuses)
         ).order_by(MRIScan.upload_date.desc()).all()
 
-    all_pending = db.query(MRIScan).filter(
+    doctor = current_user.doctor_profile
+    if not doctor:
+        doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
+
+    if not doctor:
+        return []
+
+    return db.query(MRIScan).filter(
+        MRIScan.preferred_doctor_id == doctor.id,
         MRIScan.status.in_(pending_statuses)
     ).order_by(MRIScan.upload_date.desc()).all()
-
-    seen_ids = set()
-    result = []
-    for s in my_scans + all_pending:
-        if s.id not in seen_ids:
-            seen_ids.add(s.id)
-            result.append(s)
-
-    return result
 
 @router.get("/patients", response_model=List[PatientOut])
 def get_authorized_patients_for_doctor(
@@ -297,18 +292,16 @@ def get_doctor_appointments(
     else:
         doctor = current_user.doctor_profile
         if not doctor:
+            doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
+        if not doctor:
             return {
                 "active_patients_count": 0,
                 "appointments": []
             }
 
-        all_appts = db.query(Appointment).order_by(Appointment.appointment_date.asc()).all()
-        appts = []
-        for a in all_appts:
-            if a.doctor_id == doctor.id or verify_doctor_patient_access(doctor, a.patient_id, db):
-                appts.append(a)
-        if not appts:
-            appts = all_appts
+        appts = db.query(Appointment).filter(
+            Appointment.doctor_id == doctor.id
+        ).order_by(Appointment.appointment_date.asc()).all()
 
     valid_appts = []
     for a in appts:
