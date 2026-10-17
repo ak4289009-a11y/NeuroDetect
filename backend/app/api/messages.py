@@ -92,9 +92,11 @@ def get_conversations(
             if p.id in msg_patient_ids or verify_doctor_patient_access(doctor, p.id, db)
         ]
 
+        seen_patient_ids = set()
         for p in auth_patients:
-            if not p.user_id:
+            if not p.user_id or p.user_id in seen_patient_ids:
                 continue
+            seen_patient_ids.add(p.user_id)
             last_msg = db.query(Message).filter(
                 or_(
                     and_(Message.sender_user_id == current_user.id, Message.receiver_user_id == p.user_id),
@@ -135,9 +137,18 @@ def get_conversations(
             if d.id in msg_doctor_ids or verify_doctor_patient_access(d, patient.id, db)
         ]
 
+        seen_doctor_ids = set()
+        seen_doctor_names = set()
         for d in auth_doctors:
-            if not d.user_id:
+            if not d.user_id or d.user_id in seen_doctor_ids:
                 continue
+            norm_name = (d.name or "").strip().lower()
+            if norm_name and norm_name in seen_doctor_names:
+                continue
+            seen_doctor_ids.add(d.user_id)
+            if norm_name:
+                seen_doctor_names.add(norm_name)
+
             last_msg = db.query(Message).filter(
                 or_(
                     and_(Message.sender_user_id == current_user.id, Message.receiver_user_id == d.user_id),

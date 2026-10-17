@@ -67,10 +67,39 @@ def seed_database():
             admin_user.is_active = True
             db.commit()
 
+        # Auto-reconcile distinct identities for dr.rajesh and dr.smith
+        u_rajesh = db.query(User).filter(func.lower(User.email) == "dr.rajesh@neurodetect.ai").first()
+        u_smith = db.query(User).filter(func.lower(User.email) == "dr.smith@neurodetect.ai").first()
+        u_robert = db.query(User).filter(func.lower(User.email) == "dr.robert@neurodetect.ai").first()
+
+        # If u_robert exists, delete it to free up its registration number MED-MGH-12345
+        if u_robert:
+            if u_robert.doctor_profile:
+                db.delete(u_robert.doctor_profile)
+            db.delete(u_robert)
+            db.commit()
+
+        # If u_rajesh currently has Doctor Robert Smith (from prior merge) and u_smith is missing:
+        if u_rajesh and not u_smith and u_rajesh.doctor_profile and "Robert" in (u_rajesh.doctor_profile.name or ""):
+            u_rajesh.email = "dr.smith@neurodetect.ai"
+            u_rajesh.doctor_profile.medical_reg_no = "MED-MGH-12345"
+            db.commit()
+            u_smith = u_rajesh
+            u_rajesh = None
+
+        if u_smith and u_smith.doctor_profile:
+            u_smith.doctor_profile.name = "Dr. Robert Smith"
+            u_smith.doctor_profile.specialization = "Director of Neurology"
+            u_smith.doctor_profile.hospital = "Massachusetts General Hospital"
+            u_smith.doctor_profile.city = "Boston"
+            u_smith.doctor_profile.location = "Boston, MA, USA"
+            u_smith.doctor_profile.medical_reg_no = "MED-MGH-12345"
+            db.commit()
+
         # 2. DOCTORS BY INDIA-WIDE LOCATION
         doctors_data = [
             ("dr.rajesh@neurodetect.ai", "Doctor@123456", "Dr. Rajesh Kumar", "Senior Neuro-Oncologist", "AIIMS Medical Center", "New Delhi", "New Delhi, Delhi, India", "MED-AIIMS-99201", 14, True),
-            ("dr.smith@neurodetect.ai", "Doctor@123456", "Dr. Rajesh Kumar", "Senior Neuro-Oncologist", "AIIMS Medical Center", "New Delhi", "New Delhi, Delhi, India", "MED-AIIMS-99200", 14, True),
+            ("dr.smith@neurodetect.ai", "Doctor@123456", "Dr. Robert Smith", "Director of Neurology", "Massachusetts General Hospital", "Boston", "Boston, MA, USA", "MED-MGH-12345", 20, True),
             ("dr.thorne@neurodetect.ai", "Doctor@123456", "Dr. Sunita Patel", "Chief Neuroradiologist", "Apollo Hospital", "Mumbai", "Mumbai, MH, India", "MED-APOLLO-77123", 16, True),
             ("dr.vikram@neurodetect.ai", "Doctor@123456", "Dr. Vikram Rao", "Consultant Neurosurgeon", "Manipal Hospital", "Bangalore", "Bangalore, KA, India", "MED-MANIPAL-44321", 12, True),
             ("dr.ananya@neurodetect.ai", "Doctor@123456", "Dr. Ananya Sharma", "Neuro-radiology Specialist", "SMS Hospital", "Jaipur", "Jaipur, RJ, India", "MED-SMS-88901", 10, True),
@@ -80,7 +109,6 @@ def seed_database():
             ("dr.deshmukh@neurodetect.ai", "Doctor@123456", "Dr. Sanjay Deshmukh", "Neurological Specialist", "KEM Hospital", "Pune", "Pune, MH, India", "MED-KEM-33211", 11, True),
             ("dr.baruah@neurodetect.ai", "Doctor@123456", "Dr. Pranab Baruah", "Consultant Neuroradiologist", "GNRC Hospital", "Guwahati", "Guwahati, Assam, India", "MED-GNRC-77441", 13, True),
             ("dr.dash@neurodetect.ai", "Doctor@123456", "Dr. Alok Dash", "Neuro-Oncology Director", "AMRI Hospital", "Bhubaneswar", "Bhubaneswar, Odisha, India", "MED-AMRI-55112", 19, True),
-            ("dr.robert@neurodetect.ai", "Doctor@123456", "Dr. Robert Smith", "Director of Neurology", "Massachusetts General Hospital", "Boston", "Boston, MA, USA", "MED-MGH-12345", 20, True),
             ("dr.sneha@neurodetect.ai", "Doctor@123456", "Dr. Sneha Verma", "Consultant Neuroradiologist", "Fortis Hospital", "Noida", "Noida, UP, India", "MED-FORTIS-88712", 8, False),
             ("dr.alok@neurodetect.ai", "Doctor@123456", "Dr. Alok Nath", "Neurosurgeon", "Max Healthcare", "Gurgaon", "Gurgaon, HR, India", "MED-MAX-99124", 9, False)
         ]
@@ -120,6 +148,16 @@ def seed_database():
             else:
                 d_user.hashed_password = get_password_hash(pwd)
                 d_user.is_active = True
+                if d_user.doctor_profile:
+                    d_user.doctor_profile.name = name
+                    d_user.doctor_profile.specialization = spec
+                    d_user.doctor_profile.hospital = hosp
+                    d_user.doctor_profile.city = city
+                    d_user.doctor_profile.location = loc
+                    d_user.doctor_profile.medical_reg_no = reg
+                    d_user.doctor_profile.experience_years = exp
+                    d_user.doctor_profile.status = DoctorStatus.APPROVED.value if is_appr else DoctorStatus.PENDING.value
+                    d_user.doctor_profile.is_approved = is_appr
                 db.commit()
                 created_doctors.append(d_user.doctor_profile)
 

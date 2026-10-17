@@ -113,7 +113,40 @@ class SupabaseStorageService:
             with open(local_fallback_path, "rb") as f:
                 return f.read()
 
-        raise FileNotFoundError(f"MRI object bytes for '{storage_path}' could not be retrieved.")
+    def download_model_if_needed(self, model_filename: str = "densenet121_brain_tumor.h5", target_path: Optional[str] = None) -> Optional[str]:
+        """
+        Downloads AI model binary from Supabase Storage into local cache if not already present.
+        Allows model artifacts to be safely stored in Supabase Storage instead of Git repository.
+        """
+        dest_path = target_path or os.path.join(settings.MODEL_DIR, model_filename)
+        if os.path.exists(dest_path) and os.path.getsize(dest_path) > 1000:
+            return dest_path
+
+        if not self.is_configured:
+            return None
+
+        # Look for model in bucket
+        candidate_paths = [
+            f"models/{model_filename}",
+            model_filename,
+            f"artifacts/{model_filename}"
+        ]
+
+        for remote_path in candidate_paths:
+            try:
+                print(f"[Supabase Storage] Checking for model artifact at '{self.bucket_name}/{remote_path}'...")
+                data = self.client.storage.from_(self.bucket_name).download(remote_path)
+                if data and len(data) > 1000:
+                    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                    with open(dest_path, "wb") as f:
+                        f.write(data)
+                    print(f"[Supabase Storage] Successfully downloaded model artifact to '{dest_path}' ({len(data)} bytes).")
+                    return dest_path
+            except Exception as e:
+                pass
+
+        return None
 
 
 supabase_storage = SupabaseStorageService()
+
