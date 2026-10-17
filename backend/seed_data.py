@@ -102,6 +102,7 @@ def seed_database():
 
         # 2. DOCTORS BY INDIA-WIDE LOCATION
         doctors_data = [
+            ("anu@neurodetect.ai", "Doctor@123456", "anu", "Consultant Neurologist & Lead Specialist", "Apollo Hospital", "New Delhi", "New Delhi, Delhi, India", "MED-APOLLO-99001", 12, True),
             ("dr.rajesh@neurodetect.ai", "Doctor@123456", "Dr. Rajesh Kumar", "Senior Neuro-Oncologist", "AIIMS Medical Center", "New Delhi", "New Delhi, Delhi, India", "MED-AIIMS-99201", 14, True),
             ("dr.smith@neurodetect.ai", "Doctor@123456", "Dr. Robert Smith", "Director of Neurology", "Massachusetts General Hospital", "Boston", "Boston, MA, USA", "MED-MGH-12345", 20, True),
             ("dr.thorne@neurodetect.ai", "Doctor@123456", "Dr. Sunita Patel", "Chief Neuroradiologist", "Apollo Hospital", "Mumbai", "Mumbai, MH, India", "MED-APOLLO-77123", 16, True),
@@ -219,27 +220,28 @@ def seed_database():
         tumor_types = ["Glioma", "Meningioma", "Pituitary", "No Tumor"]
         # 4. PATIENT-DOCTOR SELECTION MAPPING & SCAN GENERATION
         doc_map = {d.name: d for d in created_doctors if d}
-        dr_rajesh = doc_map.get("Dr. Rajesh Kumar") or created_doctors[0]
-        dr_smith = doc_map.get("Dr. Robert Smith") or (created_doctors[1] if len(created_doctors) > 1 else dr_rajesh)
+        dr_anu = db.query(Doctor).filter(func.lower(Doctor.name) == "anu").first() or doc_map.get("anu") or created_doctors[0]
+        dr_rajesh = doc_map.get("Dr. Rajesh Kumar") or created_doctors[1]
+        dr_smith = doc_map.get("Dr. Robert Smith") or created_doctors[2]
         dr_vikram = doc_map.get("Dr. Vikram Rao") or dr_rajesh
         dr_ananya = doc_map.get("Dr. Ananya Sharma") or dr_smith
         dr_sneha = doc_map.get("Dr. Sneha Verma") or dr_rajesh
 
         # Dedicated Patient -> Selected Doctor dictionary
         patient_doctor_rules = {
-            "patient@neurodetect.ai": dr_rajesh,
+            "patient@neurodetect.ai": dr_anu,
+            "ak4289009@gmail.com": dr_anu,
+            "priya.s@example.com": dr_anu,
+            "kumarrayshubham2005@gmail.com": dr_anu,
             "amitav.roy@example.com": dr_rajesh,
             "rajesh.prasad@example.com": dr_rajesh,
-            "ak4289009@gmail.com": dr_rajesh,
-            "priya.s@example.com": dr_smith,
+            "sunita.b@example.com": dr_rajesh,
             "vance.a@example.com": dr_smith,
-            "sunita.b@example.com": dr_smith,
             "deepak.v@example.com": dr_vikram,
             "kavita.k@example.com": dr_vikram,
             "biren.das@example.com": dr_ananya,
             "archana.m@example.com": dr_ananya,
             "suresh.m@example.com": dr_sneha,
-            "kumarrayshubham2005@gmail.com": dr_sneha,
             "testuser99@example.com": dr_sneha
         }
 
