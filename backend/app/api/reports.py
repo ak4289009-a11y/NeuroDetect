@@ -39,10 +39,11 @@ def download_pdf_report(
     
     patient_dict = {
         "id": patient.id if patient else 0,
-        "name": patient.name if patient else "Unknown Patient",
-        "age": patient.age if patient else 0,
-        "gender": patient.gender if patient else "N/A",
-        "phone": patient.phone if patient else "N/A"
+        "name": patient.name if patient else "Demo Patient",
+        "age": patient.age if patient else None,
+        "gender": patient.gender if patient else "Not Specified",
+        "phone": patient.phone if patient else "N/A",
+        "medical_history": patient.medical_history if patient else None
     }
 
     ai_dict = {
@@ -55,18 +56,22 @@ def download_pdf_report(
     heatmap_abs_path = os.path.join(settings.BASE_DIR, ai_report.heatmap_path.lstrip("/")) if ai_report else None
 
     review_dict = None
-    if doctor_review:
+    if doctor_review and str(doctor_review.status).upper() == "APPROVED":
         doctor = db.query(Doctor).filter(Doctor.id == doctor_review.doctor_id).first()
         review_dict = {
+            "status": doctor_review.status,
             "diagnosis": doctor_review.diagnosis,
             "clinical_notes": doctor_review.clinical_notes,
             "prescription": doctor_review.prescription,
             "suggested_tests": doctor_review.suggested_tests,
             "medicines": doctor_review.medicines,
             "next_visit_date": doctor_review.next_visit_date,
+            "reviewed_at": doctor_review.reviewed_at.strftime("%d %B %Y, %I:%M %p") if doctor_review.reviewed_at else None,
             "doctor": {
                 "name": doctor.name if doctor else "Attending Specialist",
-                "specialization": doctor.specialization if doctor else "Neurology"
+                "specialization": doctor.specialization if doctor else "Neurology",
+                "hospital": doctor.hospital if doctor else None,
+                "medical_reg_no": doctor.medical_reg_no if doctor else None
             }
         }
 
@@ -119,14 +124,18 @@ def email_pdf_report(
 
     success = send_email_notification(
         to_email=patient_user.email,
-        subject=f"NeuroDetect: Brain Tumor Diagnostic Report #{report_id}",
+        subject=f"NeuroDetect: AI-Assisted Brain MRI Classification Report #{report_id} (DEMO - NOT FOR CLINICAL USE)",
         body_html=f"""
-        <h2>NeuroDetect MRI Diagnostic Summary</h2>
+        <h2>NeuroDetect — AI-Assisted Brain MRI Classification Report</h2>
+        <p><b>DEMO — NOT FOR CLINICAL USE • For Research & Demonstration Only</b></p>
         <p>Dear {patient.name},</p>
-        <p>Your DenseNet121 MRI Brain Scan report (#ND-{report_id:05d}) is attached and available in your portal.</p>
-        <p><b>Diagnosis Classification:</b> {ai_report.tumor_type}</p>
-        <p><b>Confidence Score:</b> {ai_report.confidence}%</p>
-        <br/><p>Best regards,<br/>NeuroDetect Healthcare Team</p>
+        <p>Your AI-assisted brain MRI screening report (#ND-REP-{report_id:05d}) has been compiled and is available in your clinical portal.</p>
+        <div style="background:#f8fafc; border-left:4px solid #2563eb; padding:12px; margin:16px 0;">
+          <p style="margin:4px 0;"><b>Model-predicted class:</b> {ai_report.tumor_type}</p>
+          <p style="margin:4px 0;"><b>Model confidence:</b> {ai_report.confidence}%</p>
+          <p style="margin:8px 0 4px; color:#dc2626; font-size:12px;"><b>Clinical Notice:</b> This output reflects model statistical classification based on image features. It is not a confirmed medical diagnosis or necessarily an {ai_report.confidence}% probability of disease. Specialist validation is required prior to any clinical decision.</p>
+        </div>
+        <p>Best regards,<br/>NeuroDetect AI Research & Clinical Portal Desk</p>
         """
     )
 

@@ -242,7 +242,7 @@ const UserProfileCard = () => {
                     <Building2 className="w-4 h-4 text-indigo-600 mt-0.5 shrink-0" />
                     <div>
                       <span className="text-gray-400 font-semibold block text-[10px] uppercase">Affiliated Medical Center</span>
-                      <p className="font-bold text-gray-900 text-xs">{doctorData.hospital || 'AIIMS Medical Research Institute'}</p>
+                      <p className="font-bold text-gray-900 text-xs">{doctorData.hospital || 'Neuro-Imaging Research Center'}</p>
                     </div>
                   </div>
 
@@ -318,20 +318,20 @@ const UserProfileCard = () => {
                   <Sparkles className="w-3.5 h-3.5" />
                 </div>
                 <h4 className="font-extrabold text-sm sm:text-base text-white tracking-tight">
-                  {doctorData.hospital || 'AIIMS New Delhi — Advanced Institute of Neuro-Oncology'}
+                  {doctorData.hospital || 'NeuroDetect Clinical Neuro-Imaging Network'}
                 </h4>
                 <p className="text-[11px] text-slate-300 font-medium">
-                  Department of Radiomics & Deep Learning Diagnostics • National Neuro Network
+                  Department of Radiomics & Deep Learning Diagnostics • Research Demonstration Portal
                 </p>
                 <div className="pt-1 flex flex-wrap gap-1.5">
                   <span className="px-2 py-0.5 bg-white/10 text-white rounded text-[10px] font-bold border border-white/20">
-                    🏥 NABH Accredited
+                    🔬 Deep Learning Screening
                   </span>
                   <span className="px-2 py-0.5 bg-white/10 text-white rounded text-[10px] font-bold border border-white/20">
-                    🔬 ISO 15189 Certified
+                    🛡️ Research Prototype
                   </span>
                   <span className="px-2 py-0.5 bg-white/10 text-white rounded text-[10px] font-bold border border-white/20">
-                    🛡️ ICMR Approved
+                    🔒 Encrypted Cloud Storage
                   </span>
                 </div>
               </div>

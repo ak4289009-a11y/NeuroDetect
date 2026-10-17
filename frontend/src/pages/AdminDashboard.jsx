@@ -1119,11 +1119,11 @@ const AdminDashboard = () => {
                     </div>
 
                     <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-xl flex items-center justify-between text-blue-900">
-                      <span className="text-[11px] font-bold">Institution Accreditations & Certifications</span>
+                      <span className="text-[11px] font-bold">Platform Capabilities & Architecture</span>
                       <div className="flex gap-1.5">
-                        <span className="px-2 py-0.5 bg-white text-blue-700 rounded font-bold text-[10px] border border-blue-200">NABH Accredited</span>
-                        <span className="px-2 py-0.5 bg-white text-blue-700 rounded font-bold text-[10px] border border-blue-200">ISO 15189</span>
-                        <span className="px-2 py-0.5 bg-white text-blue-700 rounded font-bold text-[10px] border border-blue-200">ICMR Approved</span>
+                        <span className="px-2 py-0.5 bg-white text-blue-700 rounded font-bold text-[10px] border border-blue-200">AI Screening Engine</span>
+                        <span className="px-2 py-0.5 bg-white text-blue-700 rounded font-bold text-[10px] border border-blue-200">DenseNet-121</span>
+                        <span className="px-2 py-0.5 bg-white text-blue-700 rounded font-bold text-[10px] border border-blue-200">Grad-CAM Attention</span>
                       </div>
                     </div>
                   </div>
