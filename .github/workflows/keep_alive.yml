@@ -1,0 +1,51 @@
+name: Keep Backend Always Active
+
+on:
+  schedule:
+    # Run every 10 minutes (Render free tier spins down after 15 minutes of inactivity)
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  keep-alive:
+    name: Ping Health Endpoint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping NeuroDetect Backend
+        run: |
+          TARGET_URL="${{ secrets.RENDER_BACKEND_URL }}"
+          if [ -z "$TARGET_URL" ]; then
+            TARGET_URL="${{ vars.RENDER_BACKEND_URL }}"
+          fi
+
+          # List of potential endpoints to ping
+          URLS=()
+          if [ -n "$TARGET_URL" ]; then
+            URLS+=("$TARGET_URL")
+          fi
+          # Fallback known project deployment URLs
+          URLS+=("https://neurodetect-clinical-portal.onrender.com")
+          URLS+=("https://neurodetect-backend-r3v6.onrender.com")
+
+          echo "=========================================================="
+          echo "  NeuroDetect 24/7 Always-Active Keep-Alive Ping"
+          echo "=========================================================="
+
+          for BASE in "${URLS[@]}"; do
+            CLEAN_URL="${BASE%/}"
+            HEALTH_URL="$CLEAN_URL/health"
+            echo "Pinging: $HEALTH_URL"
+            
+            # Allow up to 75 seconds for cold start wake-up if sleeping
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 75 "$HEALTH_URL" || echo "ERR")
+            
+            echo "Response HTTP Code: $HTTP_CODE"
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "  -> SUCCESS: Backend is ACTIVE and responded with HTTP 200 OK."
+            elif [ "$HTTP_CODE" = "ERR" ]; then
+              echo "  -> NOTICE: Connection timed out or DNS unresolvable."
+            else
+              echo "  -> STATUS: Backend returned HTTP $HTTP_CODE (service waking up or starting)."
+            fi
+            echo "----------------------------------------------------------"
+          done

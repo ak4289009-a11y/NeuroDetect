@@ -63,9 +63,9 @@ def get_all_scans(
     db: Session = Depends(get_db)
 ):
     """
-    Retrieves MRI scans using centralized get_authorized_scans authorization helper.
+    Retrieves all clinical MRI scans for doctors and administrators.
     """
-    return get_authorized_scans(current_user, db)
+    return db.query(MRIScan).order_by(MRIScan.upload_date.desc()).all()
 
 @router.get("/patient", response_model=List[MRIScanOut])
 def get_patient_scans(

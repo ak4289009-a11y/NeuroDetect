@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_ROLE_KEY: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", os.getenv("SUPABASE_KEY", ""))
     SUPABASE_BUCKET_NAME: str = os.getenv("SUPABASE_BUCKET_NAME", "NeuroDetect Org")
     
+    # Keep-Alive Configuration (Render 24/7 Always-Active)
+    KEEP_ALIVE_URL: str = os.getenv("KEEP_ALIVE_URL", os.getenv("RENDER_EXTERNAL_URL", ""))
+    KEEP_ALIVE_INTERVAL_SECONDS: int = int(os.getenv("KEEP_ALIVE_INTERVAL_SECONDS", "540"))
+    
     # AI Model Settings
     MODEL_PATH: str = os.path.join(MODEL_DIR, "densenet121_brain_tumor.h5")
     IMAGE_SIZE: tuple = (224, 224)

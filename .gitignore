@@ -17,6 +17,9 @@ env/
 neurodetect.db
 uploads/
 reports/
+*.pid
+*.log
+backend_service.log
 
 # Node / Frontend
 node_modules/

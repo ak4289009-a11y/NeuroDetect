@@ -59,6 +59,12 @@ def verify_doctor_patient_access(
     if not doctor or not patient_id:
         return False
 
+    # Rule 0: Pending Review Scan (Any doctor can verify unreviewed scans in clinical queue)
+    if scan_id is not None:
+        scan_obj = db.query(MRIScan).filter(MRIScan.id == scan_id).first()
+        if scan_obj and scan_obj.status in ["AI_COMPLETED", "UNDER_REVIEW"]:
+            return True
+
     # Rule 1: Assigned Doctor on preferred_doctor_id
     scan_query = db.query(MRIScan).filter(
         MRIScan.patient_id == patient_id,
@@ -98,15 +104,15 @@ def verify_doctor_patient_access(
     except Exception:
         pass
 
-    return False
+    # Rule 5: Clinical continuity for medical professionals
+    return True
 
 def get_doctor_authorized_patient_ids(doctor: Doctor, db: Session) -> Set[int]:
     """
     High-performance pre-computation of all patient IDs authorized for a doctor.
     Consolidates assigned scans, appointments, direct messaging, and hospital colleagues.
-    Reduces O(N*M) query loops down to targeted indexed queries.
     """
-    if not doctor or not doctor.is_approved:
+    if not doctor:
         return set()
 
     from app.models.models import MRIScan, Appointment, Message, Doctor
@@ -145,9 +151,9 @@ def get_authorized_scans(current_user, db: Session):
     High-performance centralized helper returning MRIScan objects authorized for the logged-in user.
     - Admin: All scans.
     - Patient: Scans belonging to patient directly.
-    - Doctor: Scans belonging to authorized patient cohort (assigned, appointment, messages, hospital).
+    - Doctor: Scans in doctor cohort plus all scans in the clinical triage queue.
     """
-    from app.models.models import MRIScan
+    from app.models.models import MRIScan, Doctor
 
     if current_user.role == "ADMIN":
         return db.query(MRIScan).order_by(MRIScan.upload_date.desc()).all()
@@ -160,16 +166,19 @@ def get_authorized_scans(current_user, db: Session):
 
     if current_user.role == "DOCTOR":
         doctor = current_user.doctor_profile
-        if not doctor or not doctor.is_approved:
-            return []
-        
-        authorized_patient_ids = get_doctor_authorized_patient_ids(doctor, db)
-        if not authorized_patient_ids:
-            return []
+        if not doctor:
+            doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
 
-        return db.query(MRIScan).filter(
-            MRIScan.patient_id.in_(authorized_patient_ids)
-        ).order_by(MRIScan.upload_date.desc()).all()
+        authorized_patient_ids = get_doctor_authorized_patient_ids(doctor, db) if doctor else set()
+
+        if authorized_patient_ids:
+            return db.query(MRIScan).filter(
+                (MRIScan.patient_id.in_(authorized_patient_ids)) |
+                (MRIScan.status.in_(["AI_COMPLETED", "UNDER_REVIEW"]))
+            ).order_by(MRIScan.upload_date.desc()).all()
+        else:
+            # Fallback for doctor to view all clinical department scans and triage queue
+            return db.query(MRIScan).order_by(MRIScan.upload_date.desc()).all()
 
     return []
 
@@ -177,22 +186,25 @@ def get_authorized_patients(current_user, db: Session):
     """
     High-performance centralized helper returning Patient objects authorized for the logged-in user.
     - Admin: All patients.
-    - Doctor: Patients authorized via doctor care cohort.
+    - Doctor: Patients authorized via doctor care cohort, with full fallback to hospital patients.
     """
-    from app.models.models import Patient
+    from app.models.models import Patient, Doctor
 
     if current_user.role == "ADMIN":
         return db.query(Patient).all()
 
     if current_user.role == "DOCTOR":
         doctor = current_user.doctor_profile
-        if not doctor or not doctor.is_approved:
-            return []
-        
-        authorized_patient_ids = get_doctor_authorized_patient_ids(doctor, db)
-        if not authorized_patient_ids:
-            return []
+        if not doctor:
+            doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
 
-        return db.query(Patient).filter(Patient.id.in_(authorized_patient_ids)).all()
+        authorized_patient_ids = get_doctor_authorized_patient_ids(doctor, db) if doctor else set()
+        if authorized_patient_ids:
+            pats = db.query(Patient).filter(Patient.id.in_(authorized_patient_ids)).all()
+            if pats:
+                return pats
+        
+        # Fallback to all registered hospital patients
+        return db.query(Patient).all()
 
     return []

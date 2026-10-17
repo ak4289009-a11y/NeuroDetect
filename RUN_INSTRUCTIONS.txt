@@ -5,8 +5,17 @@ AI-Powered Deep Learning Neuro-Radiology Platform
 
 HOW TO RUN THE APPLICATION:
 --------------------------
-1. Double-click the file "START_NEURODETECT.bat" in this directory.
-2. The application will start and open automatically in your web browser at:
+Option A: Standard Interactive Window
+  Double-click "START_NEURODETECT.bat" in this directory.
+
+Option B: ALWAYS ACTIVE (Background Service + Auto-Restart Watchdog)
+  1. Start in Background: Double-click "START_ALWAYS_ACTIVE.bat"
+     (Runs silently in the background with zero terminal windows; auto-restarts if crashed)
+  2. Check Service Health: Double-click "CHECK_STATUS.bat"
+  3. Stop Service: Double-click "STOP_ALWAYS_ACTIVE.bat"
+  4. Auto-Start on Windows Boot: Double-click "INSTALL_WINDOWS_AUTOSTART.bat"
+
+Application will be available at:
    http://127.0.0.1:8000
 
 (Note: Node.js is NOT required. The React frontend is already compiled into

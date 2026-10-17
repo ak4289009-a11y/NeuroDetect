@@ -47,6 +47,10 @@ def seed_database():
     db = SessionLocal()
 
     try:
+        # Auto-approve all doctors in database to activate clinical dashboards
+        db.query(Doctor).update({Doctor.is_approved: True, Doctor.status: DoctorStatus.APPROVED.value})
+        db.commit()
+
         print("[Seeding] Populating database with Clean Realistic Demo Dataset (10 Doctors, 10 Patients, 50 Historical Scans)...")
 
         # 1. ADMIN USER

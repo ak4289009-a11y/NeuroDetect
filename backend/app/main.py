@@ -87,6 +87,14 @@ def health_check():
     """Unauthenticated health check endpoint for deployment monitoring."""
     return {"status": "ok", "system": settings.PROJECT_NAME, "version": settings.VERSION}
 
+import asyncio
+from app.services.keep_alive import keep_alive_daemon
+
+@app.on_event("startup")
+async def start_keep_alive_service():
+    """Launch background keep-alive worker to prevent container idle sleep."""
+    asyncio.create_task(keep_alive_daemon())
+
 from fastapi.responses import HTMLResponse
 
 @app.get("/quick-login/{role}", include_in_schema=False)

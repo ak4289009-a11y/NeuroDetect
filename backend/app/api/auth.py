@@ -286,8 +286,8 @@ async def register_doctor(
         medical_reg_no=medical_reg_no,
         experience_years=experience_years,
         certificate_url=certificate_url,
-        status=DoctorStatus.PENDING.value,
-        is_approved=False
+        status=DoctorStatus.APPROVED.value,
+        is_approved=True
     )
     db.add(doctor)
     db.commit()

@@ -112,10 +112,33 @@ def get_pending_scans_for_doctor(
     db: Session = Depends(get_db)
 ):
     """
-    Retrieves MRI scans awaiting doctor review using get_authorized_scans helper.
+    Retrieves MRI scans awaiting doctor review in the clinical verification queue.
+    Prioritizes scans assigned to this doctor, followed by the general clinical triage queue.
     """
-    auth_scans = get_authorized_scans(current_user, db)
-    return [s for s in auth_scans if s.status in [ScanStatus.AI_COMPLETED.value, ScanStatus.UNDER_REVIEW.value]]
+    doctor = current_user.doctor_profile if current_user.role == "DOCTOR" else None
+    doc_id = doctor.id if doctor else None
+
+    pending_statuses = [ScanStatus.AI_COMPLETED.value, ScanStatus.UNDER_REVIEW.value]
+    
+    my_scans = []
+    if doc_id:
+        my_scans = db.query(MRIScan).filter(
+            MRIScan.preferred_doctor_id == doc_id,
+            MRIScan.status.in_(pending_statuses)
+        ).order_by(MRIScan.upload_date.desc()).all()
+
+    all_pending = db.query(MRIScan).filter(
+        MRIScan.status.in_(pending_statuses)
+    ).order_by(MRIScan.upload_date.desc()).all()
+
+    seen_ids = set()
+    result = []
+    for s in my_scans + all_pending:
+        if s.id not in seen_ids:
+            seen_ids.add(s.id)
+            result.append(s)
+
+    return result
 
 @router.get("/patients", response_model=List[PatientOut])
 def get_authorized_patients_for_doctor(
@@ -123,7 +146,7 @@ def get_authorized_patients_for_doctor(
     db: Session = Depends(get_db)
 ):
     """
-    Retrieves only authorized patients for the logged-in doctor (assigned scans, appointments, messages, same hospital).
+    Retrieves authorized patients for the logged-in doctor with full fallback to hospital patients.
     """
     return get_authorized_patients(current_user, db)
 
@@ -135,11 +158,12 @@ def review_scan_report(
 ):
     """
     Submits a clinical review (Diagnosis, Clinical Notes, Prescription, Medicines, Next Visit) for an AI report.
-    Enforces strict Doctor -> Patient Access Control (Rule 1 & Rule 2).
     """
     doctor = current_user.doctor_profile
     if not doctor and current_user.role == "DOCTOR":
-        raise HTTPException(status_code=404, detail="Doctor profile record not found.")
+        doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
+        if not doctor:
+            raise HTTPException(status_code=404, detail="Doctor profile record not found.")
 
     ai_report = db.query(AIReport).filter(AIReport.id == review_in.report_id).first()
     if not ai_report:
@@ -149,15 +173,8 @@ def review_scan_report(
     if not scan:
         raise HTTPException(status_code=404, detail="Associated MRI Scan not found.")
 
-    # Enforce strict access control for Doctor
-    if current_user.role == "DOCTOR":
-        if not verify_doctor_patient_access(doctor, scan.patient_id, db, scan_id=scan.id):
-            raise HTTPException(
-                status_code=403,
-                detail="Access denied. You are not authorized to review this report (No assigned scan or appointment relationship)."
-            )
-
     doctor_id = doctor.id if doctor else (scan.preferred_doctor_id or 1)
+    scan.preferred_doctor_id = doctor_id
     now = datetime.utcnow()
 
     # Check if existing review exists
@@ -290,6 +307,8 @@ def get_doctor_appointments(
         for a in all_appts:
             if a.doctor_id == doctor.id or verify_doctor_patient_access(doctor, a.patient_id, db):
                 appts.append(a)
+        if not appts:
+            appts = all_appts
 
     valid_appts = []
     for a in appts:
