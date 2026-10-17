@@ -102,7 +102,7 @@ def seed_database():
 
         # 2. DOCTORS BY INDIA-WIDE LOCATION
         doctors_data = [
-            ("anu@neurodetect.ai", "Doctor@123456", "anu", "Consultant Neurologist & Lead Specialist", "Apollo Hospital", "New Delhi", "New Delhi, Delhi, India", "MED-APOLLO-99001", 12, True),
+            ("anu@neurodetect.ai", "Doctor@123456", "Dr. Anuradha Kumari", "Consultant Neuro-Oncologist", "NeuroDetect Clinical Center", "New Delhi", "New Delhi, Delhi, India", "MED-ANU-10021", 10, True),
             ("dr.rajesh@neurodetect.ai", "Doctor@123456", "Dr. Rajesh Kumar", "Senior Neuro-Oncologist", "AIIMS Medical Center", "New Delhi", "New Delhi, Delhi, India", "MED-AIIMS-99201", 14, True),
             ("dr.smith@neurodetect.ai", "Doctor@123456", "Dr. Robert Smith", "Director of Neurology", "Massachusetts General Hospital", "Boston", "Boston, MA, USA", "MED-MGH-12345", 20, True),
             ("dr.thorne@neurodetect.ai", "Doctor@123456", "Dr. Sunita Patel", "Chief Neuroradiologist", "Apollo Hospital", "Mumbai", "Mumbai, MH, India", "MED-APOLLO-77123", 16, True),
@@ -168,6 +168,7 @@ def seed_database():
 
         # 3. PATIENTS (10 Demo Indian Patients + 1 US Test Patient)
         patients_data = [
+            ("ak4289009@gmail.com", "Patient@123456", "Anuradha Kumari", 28, "Female", "+91 98765 12345", "New Delhi, Delhi, India"),
             ("kumarrayshubham2005@gmail.com", "Patient@123456", "Shubham Kumar", 24, "Male", "+91 98765 43210", "New Delhi, Delhi, India"),
             ("patient@neurodetect.ai", "Patient@123456", "Ramesh Kumar", 45, "Male", "+91 98765 43210", "Sector 14, MG Road, New Delhi, Delhi"),
             ("priya.s@example.com", "Patient@123456", "Priya Sharma", 36, "Female", "+91 98123 45678", "Civil Lines, Jaipur, Rajasthan"),
@@ -210,38 +211,45 @@ def seed_database():
                 db.refresh(pat)
                 patients_list.append(pat)
             else:
-                if clean_e in ["kumarrayshubham2005@gmail.com", "patient@neurodetect.ai"]:
+                if clean_e in ["kumarrayshubham2005@gmail.com", "patient@neurodetect.ai", "ak4289009@gmail.com"]:
                     p_user.hashed_password = get_password_hash(pwd)
                     p_user.is_active = True
+                    if p_user.patient_profile:
+                        p_user.patient_profile.name = name
+                        p_user.patient_profile.age = age
+                        p_user.patient_profile.gender = gender
+                        p_user.patient_profile.phone = phone
+                        p_user.patient_profile.address = addr
                     db.commit()
                 patients_list.append(p_user.patient_profile)
 
         # 4. MRI SCANS & AI REPORTS GENERATION (At least 5 Historical Scans per Patient)
-        tumor_types = ["Glioma", "Meningioma", "Pituitary", "No Tumor"]
         # 4. PATIENT-DOCTOR SELECTION MAPPING & SCAN GENERATION
         doc_map = {d.name: d for d in created_doctors if d}
-        dr_anu = db.query(Doctor).filter(func.lower(Doctor.name) == "anu").first() or doc_map.get("anu") or created_doctors[0]
-        dr_rajesh = doc_map.get("Dr. Rajesh Kumar") or created_doctors[1]
-        dr_smith = doc_map.get("Dr. Robert Smith") or created_doctors[2]
+        dr_anu = db.query(Doctor).join(User, Doctor.user_id == User.id).filter(func.lower(User.email) == "anu@neurodetect.ai").first()
+        if not dr_anu:
+            dr_anu = doc_map.get("Dr. Anuradha Kumari")
+        dr_rajesh = doc_map.get("Dr. Rajesh Kumar") or created_doctors[0]
+        dr_smith = doc_map.get("Dr. Robert Smith") or (created_doctors[1] if len(created_doctors) > 1 else dr_rajesh)
         dr_vikram = doc_map.get("Dr. Vikram Rao") or dr_rajesh
         dr_ananya = doc_map.get("Dr. Ananya Sharma") or dr_smith
         dr_sneha = doc_map.get("Dr. Sneha Verma") or dr_rajesh
 
         # Dedicated Patient -> Selected Doctor dictionary
         patient_doctor_rules = {
-            "patient@neurodetect.ai": dr_anu,
-            "ak4289009@gmail.com": dr_anu,
-            "priya.s@example.com": dr_anu,
-            "kumarrayshubham2005@gmail.com": dr_anu,
+            "ak4289009@gmail.com": dr_anu or dr_rajesh,
+            "patient@neurodetect.ai": dr_anu or dr_rajesh,
             "amitav.roy@example.com": dr_rajesh,
             "rajesh.prasad@example.com": dr_rajesh,
-            "sunita.b@example.com": dr_rajesh,
+            "deepak.v@example.com": dr_rajesh,
+            "priya.s@example.com": dr_smith,
             "vance.a@example.com": dr_smith,
-            "deepak.v@example.com": dr_vikram,
+            "sunita.b@example.com": dr_smith,
             "kavita.k@example.com": dr_vikram,
             "biren.das@example.com": dr_ananya,
             "archana.m@example.com": dr_ananya,
             "suresh.m@example.com": dr_sneha,
+            "kumarrayshubham2005@gmail.com": dr_sneha,
             "testuser99@example.com": dr_sneha
         }
 

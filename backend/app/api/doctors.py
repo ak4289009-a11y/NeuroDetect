@@ -130,18 +130,10 @@ def get_pending_scans_for_doctor(
     if not doctor:
         return []
 
-    my_scans = db.query(MRIScan).filter(
+    return db.query(MRIScan).filter(
         MRIScan.preferred_doctor_id == doctor.id,
         MRIScan.status.in_(pending_statuses)
     ).order_by(MRIScan.upload_date.desc()).all()
-
-    if my_scans:
-        return my_scans
-
-    # Fallback to general clinical triage scans awaiting verification
-    return db.query(MRIScan).filter(
-        MRIScan.status.in_(pending_statuses)
-    ).order_by(MRIScan.upload_date.desc()).limit(8).all()
 
 @router.get("/patients", response_model=List[PatientOut])
 def get_authorized_patients_for_doctor(
@@ -310,9 +302,6 @@ def get_doctor_appointments(
         appts = db.query(Appointment).filter(
             Appointment.doctor_id == doctor.id
         ).order_by(Appointment.appointment_date.asc()).all()
-
-        if not appts:
-            appts = db.query(Appointment).order_by(Appointment.appointment_date.asc()).limit(5).all()
 
     valid_appts = []
     for a in appts:

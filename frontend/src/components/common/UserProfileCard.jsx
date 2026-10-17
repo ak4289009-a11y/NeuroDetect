@@ -144,7 +144,7 @@ const UserProfileCard = () => {
                     <Award className="w-4 h-4 text-indigo-600" />
                   </div>
                   <p className="text-sm font-extrabold font-mono text-gray-900 truncate">
-                    {doctorData.medical_reg_no || 'MED-REG-88392'}
+                    {doctorData.medical_reg_no || 'Verified Specialist'}
                   </p>
                 </div>
 
@@ -154,7 +154,7 @@ const UserProfileCard = () => {
                     <Calendar className="w-4 h-4 text-green-600" />
                   </div>
                   <p className="text-sm sm:text-base font-extrabold text-gray-900">
-                    {doctorData.experience_years || 12} Years Exp.
+                    {doctorData.experience_years ? `${doctorData.experience_years} Years Exp.` : 'Senior Specialist'}
                   </p>
                 </div>
 
@@ -176,7 +176,7 @@ const UserProfileCard = () => {
                     <User className="w-4 h-4 text-blue-600" />
                   </div>
                   <p className="text-sm sm:text-base font-extrabold text-gray-900">
-                    {patientData.age || 45} Yrs • {patientData.gender || 'Male'}
+                    {patientData.age ? `${patientData.age} Yrs` : 'N/A'} • {patientData.gender || 'Not Specified'}
                   </p>
                 </div>
 
@@ -186,7 +186,7 @@ const UserProfileCard = () => {
                     <Phone className="w-4 h-4 text-indigo-600" />
                   </div>
                   <p className="text-sm font-extrabold font-mono text-gray-900 truncate">
-                    {patientData.phone || '+91 98765 43210'}
+                    {patientData.phone || 'Not Provided'}
                   </p>
                 </div>
 
@@ -196,7 +196,7 @@ const UserProfileCard = () => {
                     <MapPin className="w-4 h-4 text-green-600" />
                   </div>
                   <p className="text-sm font-extrabold text-gray-900 truncate">
-                    {patientData.address || 'New Delhi, India'}
+                    {patientData.address || 'Not Provided'}
                   </p>
                 </div>
 
@@ -258,7 +258,7 @@ const UserProfileCard = () => {
                     <Award className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
                     <div>
                       <span className="text-gray-400 font-semibold block text-[10px] uppercase">Medical Registration Number</span>
-                      <p className="font-bold font-mono text-gray-900 text-xs">{doctorData.medical_reg_no || 'MED-REG-88392'}</p>
+                      <p className="font-bold font-mono text-gray-900 text-xs">{doctorData.medical_reg_no || 'Verified Specialist'}</p>
                     </div>
                   </div>
                 </div>
@@ -276,7 +276,7 @@ const UserProfileCard = () => {
                     <Phone className="w-4 h-4 text-indigo-600 mt-0.5 shrink-0" />
                     <div>
                       <span className="text-gray-400 font-semibold block text-[10px] uppercase">Primary Phone Number</span>
-                      <p className="font-bold font-mono text-gray-900 text-xs">{patientData.phone || '+91 98765 43210'}</p>
+                      <p className="font-bold font-mono text-gray-900 text-xs">{patientData.phone || 'Not Provided'}</p>
                     </div>
                   </div>
 
@@ -284,7 +284,7 @@ const UserProfileCard = () => {
                     <MapPin className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
                     <div>
                       <span className="text-gray-400 font-semibold block text-[10px] uppercase">Residential Address (India)</span>
-                      <p className="font-bold text-gray-900 text-xs">{patientData.address || 'Sector 14, MG Road, New Delhi, Delhi, India'}</p>
+                      <p className="font-bold text-gray-900 text-xs">{patientData.address || 'Not Provided'}</p>
                     </div>
                   </div>
 
@@ -292,7 +292,7 @@ const UserProfileCard = () => {
                     <HeartPulse className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
                     <div>
                       <span className="text-gray-400 font-semibold block text-[10px] uppercase">Registered Demographics</span>
-                      <p className="font-bold text-gray-900 text-xs">{patientData.age || 45} Years Old • {patientData.gender || 'Male'}</p>
+                      <p className="font-bold text-gray-900 text-xs">{patientData.age ? `${patientData.age} Years Old` : 'Age N/A'} • {patientData.gender || 'Not Specified'}</p>
                     </div>
                   </div>
                 </div>

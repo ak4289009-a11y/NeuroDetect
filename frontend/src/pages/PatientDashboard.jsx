@@ -213,7 +213,7 @@ const PatientDashboard = () => {
                     <span>Total Scans</span>
                     <FileText className="w-4 h-4 text-blue-600" />
                   </div>
-                  <p className="text-2xl font-bold text-gray-900">{statsData?.total_scans || patientScansList.length}</p>
+                  <p className="text-2xl font-bold text-gray-900">{statsData?.total_scans ?? patientScansList.length}</p>
                 </div>
 
                 <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm space-y-1">
@@ -221,7 +221,7 @@ const PatientDashboard = () => {
                     <span>Pending Reviews</span>
                     <Clock className="w-4 h-4 text-amber-500" />
                   </div>
-                  <p className="text-2xl font-bold text-gray-900">{statsData?.pending_reports || 0}</p>
+                  <p className="text-2xl font-bold text-gray-900">{statsData?.pending_reports ?? 0}</p>
                 </div>
 
                 <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm space-y-1">
@@ -229,7 +229,7 @@ const PatientDashboard = () => {
                     <span>Completed Reports</span>
                     <CheckCircle2 className="w-4 h-4 text-green-600" />
                   </div>
-                  <p className="text-2xl font-bold text-gray-900">{statsData?.completed_reports || patientScansList.length}</p>
+                  <p className="text-2xl font-bold text-gray-900">{statsData?.completed_reports ?? 0}</p>
                 </div>
 
                 <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm space-y-1">
@@ -237,7 +237,7 @@ const PatientDashboard = () => {
                     <span>Latest AI Diagnosis</span>
                     <Brain className="w-4 h-4 text-purple-600" />
                   </div>
-                  <p className="text-base font-bold text-blue-600 truncate">{statsData?.latest_diagnosis || 'Glioma'}</p>
+                  <p className="text-base font-bold text-blue-600 truncate">{statsData?.latest_diagnosis || 'No Scans Yet'}</p>
                 </div>
               </div>
 

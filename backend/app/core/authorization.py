@@ -149,16 +149,13 @@ def get_authorized_scans(current_user, db: Session):
             return []
 
         authorized_patient_ids = get_doctor_authorized_patient_ids(doctor, db)
-        my_scans = db.query(MRIScan).filter(
+        if not authorized_patient_ids:
+            return db.query(MRIScan).filter(MRIScan.preferred_doctor_id == doctor.id).order_by(MRIScan.upload_date.desc()).all()
+
+        return db.query(MRIScan).filter(
             (MRIScan.preferred_doctor_id == doctor.id) |
-            (MRIScan.patient_id.in_(authorized_patient_ids) if authorized_patient_ids else False)
+            (MRIScan.patient_id.in_(authorized_patient_ids))
         ).order_by(MRIScan.upload_date.desc()).all()
-
-        if my_scans:
-            return my_scans
-
-        # Fallback to clinic department scans so dashboard is never empty
-        return db.query(MRIScan).order_by(MRIScan.upload_date.desc()).limit(15).all()
 
     return []
 
@@ -166,7 +163,7 @@ def get_authorized_patients(current_user, db: Session):
     """
     Centralized helper returning Patient objects authorized for the logged-in user.
     - Admin: All patients.
-    - Doctor: Patients who specifically selected this doctor. If none assigned yet, provides clinic cohort.
+    - Doctor: ONLY patients who specifically selected this doctor.
     """
     from app.models.models import Patient, Doctor
 
@@ -182,10 +179,9 @@ def get_authorized_patients(current_user, db: Session):
             return []
 
         authorized_patient_ids = get_doctor_authorized_patient_ids(doctor, db)
-        if authorized_patient_ids:
-            return db.query(Patient).filter(Patient.id.in_(authorized_patient_ids)).all()
+        if not authorized_patient_ids:
+            return []
 
-        # Fallback to registered clinic patients so doctor dashboard is never 0/empty
-        return db.query(Patient).limit(5).all()
+        return db.query(Patient).filter(Patient.id.in_(authorized_patient_ids)).all()
 
     return []

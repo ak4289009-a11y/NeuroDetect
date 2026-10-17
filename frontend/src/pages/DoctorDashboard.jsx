@@ -165,18 +165,12 @@ const DoctorDashboard = () => {
     ? allScans
     : allScans.filter(s => s.ai_report?.tumor_type?.toLowerCase() === selectedTumorFilter.toLowerCase());
 
-  const getAppointmentDetails = (patientId, idx = 0) => {
+  const getAppointmentDetails = (patientId) => {
     const appt = appointments.find(a => Number(a.patient_id) === Number(patientId));
     if (appt) {
       return { date: appt.appointment_date_formatted || appt.appointment_date || 'Scheduled' };
     }
-    const defaultDates = [
-      'Aug 18, 2026 at 10:30 AM',
-      'Aug 20, 2026 at 02:15 PM',
-      'Aug 23, 2026 at 11:00 AM',
-      'Aug 25, 2026 at 04:30 PM'
-    ];
-    return { date: defaultDates[idx % defaultDates.length] };
+    return { date: 'Not Scheduled' };
   };
 
 
@@ -348,15 +342,15 @@ const DoctorDashboard = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredScansByTumor.map((scan, idx) => {
+                        {filteredScansByTumor.map((scan) => {
                           const patient = patients.find(p => p.id === scan.patient_id);
-                          const apptInfo = getAppointmentDetails(scan.patient_id, idx);
+                          const apptInfo = getAppointmentDetails(scan.patient_id);
                           return (
                             <tr key={scan.id}>
                               <td className="font-mono font-bold">#ND-{scan.id}</td>
                               <td className="font-medium text-gray-900">{patient?.name || `Patient #${scan.patient_id}`}</td>
-                              <td>{patient?.age || 45} yrs / {patient?.gender || 'Male'}</td>
-                              <td>{patient?.phone || '+91 98765 43210'}</td>
+                              <td>{patient?.age ? `${patient.age} yrs` : 'N/A'} / {patient?.gender || 'N/A'}</td>
+                              <td>{patient?.phone || 'N/A'}</td>
                               <td className="font-semibold text-blue-700">{apptInfo.date}</td>
                               <td>
                                 <span className={`px-2.5 py-0.5 rounded text-xs font-bold border ${
@@ -1033,7 +1027,7 @@ const DoctorDashboard = () => {
                 <p className="text-gray-500">Patient:</p>
                 <p className="font-bold text-gray-900">{selectedScan.patient?.name || (patients.find(p => p.id === selectedScan.patient_id)?.name) || `Patient #${selectedScan.patient_id}`}</p>
                 <p className="font-mono text-xs font-bold text-blue-700">PT-{selectedScan.patient_id}</p>
-                <p className="text-xs text-gray-500 font-medium">{selectedScan.patient?.age || (patients.find(p => p.id === selectedScan.patient_id)?.age) || 45} yrs • {selectedScan.patient?.gender || (patients.find(p => p.id === selectedScan.patient_id)?.gender) || 'Male'}</p>
+                <p className="text-xs text-gray-500 font-medium">{selectedScan.patient?.age || (patients.find(p => p.id === selectedScan.patient_id)?.age) || 'N/A'} yrs • {selectedScan.patient?.gender || (patients.find(p => p.id === selectedScan.patient_id)?.gender) || 'N/A'}</p>
               </div>
               <div>
                 <p className="text-gray-500">AI Classification & File:</p>
