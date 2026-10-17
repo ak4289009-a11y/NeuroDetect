@@ -39,6 +39,12 @@ try:
                 conn.execute(text("ALTER TABLE patients ADD COLUMN assigned_doctor_id INTEGER;"))
             except Exception:
                 pass
+
+        try:
+            conn.execute(text("ALTER TABLE messages ALTER COLUMN doctor_id DROP NOT NULL;"))
+            conn.execute(text("ALTER TABLE messages ALTER COLUMN patient_id DROP NOT NULL;"))
+        except Exception:
+            pass
         conn.commit()
 except Exception:
     pass

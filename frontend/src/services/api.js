@@ -66,6 +66,8 @@ export const doctorAPI = {
   bookAppointment: (data) => api.post('/doctors/appointments/book', data),
   getMyAppointments: () => api.get('/doctors/appointments/my-appointments'),
   cancelAppointment: (id) => api.put(`/doctors/appointments/${id}/cancel`),
+  selectDoctor: (doctorId) => api.post('/doctors/select', { doctor_id: doctorId }),
+  getSelectedDoctor: () => api.get('/doctors/selected'),
 };
 
 // Appointment Services

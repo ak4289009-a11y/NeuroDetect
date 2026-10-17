@@ -1,14 +1,16 @@
+import os
 from typing import List, Optional
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from app.core.config import settings
 from app.core.authorization import verify_doctor_patient_access, get_authorized_scans, get_authorized_patients
 from app.api.auth import require_role
 from app.models.models import (
     User, Doctor, DoctorReview, AIReport, MRIScan, Patient, ScanStatus, Notification, AuditLog, Appointment
 )
-from app.schemas.schemas import DoctorReviewCreate, DoctorReviewOut, MRIScanOut, PatientOut, DoctorOut, AppointmentCreate, AppointmentOut
+from app.schemas.schemas import DoctorReviewCreate, DoctorReviewOut, MRIScanOut, PatientOut, DoctorOut, AppointmentCreate, AppointmentOut, DoctorSelectRequest
 from app.services.email_service import send_email_notification
 
 router = APIRouter(prefix="/doctors", tags=["Doctors & Reviews"])
@@ -145,6 +147,137 @@ def get_authorized_patients_for_doctor(
     """
     return get_authorized_patients(current_user, db)
 
+@router.post("/select")
+def select_or_change_doctor(
+    req: DoctorSelectRequest,
+    current_user: User = Depends(require_role(["PATIENT"])),
+    db: Session = Depends(get_db)
+):
+    """
+    Patient explicitly selects or changes their primary neurologist.
+    Enforces:
+    1. Patient chooses doctor (cannot be claimed by doctor).
+    2. Doctor must exist and be administrator-approved.
+    3. Saves persistent DB relationship (patient.assigned_doctor_id).
+    4. When changing doctors:
+       - Revokes previous doctor's access to new requests/scans.
+       - Reassigns pending unreviewed scans to new doctor.
+       - Preserves historical medical records and reviews.
+       - Dispatches notifications to patient, new doctor, and previous doctor.
+       - Logs audit event.
+    """
+    patient = current_user.patient_profile
+    if not patient:
+        patient = Patient(
+            user_id=current_user.id,
+            name=current_user.email.split("@")[0].title(),
+            age=30,
+            gender="Not Specified",
+            phone="Not Specified"
+        )
+        db.add(patient)
+        db.commit()
+        db.refresh(patient)
+
+    prev_doctor_id = patient.assigned_doctor_id
+
+    # If unselecting doctor (req.doctor_id is None)
+    if req.doctor_id is None:
+        patient.assigned_doctor_id = None
+        audit = AuditLog(
+            user_id=current_user.id,
+            action="PATIENT_UNSELECT_DOCTOR",
+            details=f"Patient {patient.name} deselected doctor (was #{prev_doctor_id})"
+        )
+        db.add(audit)
+        db.commit()
+        return {"message": "Doctor deselected successfully.", "assigned_doctor": None}
+
+    # Verify target doctor exists and is approved
+    doctor = db.query(Doctor).filter(
+        Doctor.id == req.doctor_id,
+        Doctor.is_approved == True
+    ).first()
+    if not doctor:
+        raise HTTPException(
+            status_code=404,
+            detail="The selected doctor was not found or is not approved by hospital administration."
+        )
+
+    # If already selected this doctor, no change needed
+    if prev_doctor_id == doctor.id:
+        return {
+            "message": f"Dr. {doctor.name} is already your selected doctor.",
+            "assigned_doctor": doctor
+        }
+
+    # Persist the new doctor selection
+    patient.assigned_doctor_id = doctor.id
+
+    # Reassign pending unreviewed scans (AI_COMPLETED, UNDER_REVIEW) to the new doctor
+    pending_scans = db.query(MRIScan).filter(
+        MRIScan.patient_id == patient.id,
+        MRIScan.status.in_([ScanStatus.AI_COMPLETED.value, ScanStatus.UNDER_REVIEW.value])
+    ).all()
+    for s in pending_scans:
+        s.preferred_doctor_id = doctor.id
+
+    # Notify patient
+    pat_notif = Notification(
+        user_id=current_user.id,
+        title="Primary Doctor Updated",
+        message=f"You have selected Dr. {doctor.name} ({doctor.hospital}, {doctor.specialization}) as your primary doctor."
+    )
+    db.add(pat_notif)
+
+    # Notify newly selected doctor
+    if doctor.user_id:
+        doc_notif = Notification(
+            user_id=doctor.user_id,
+            title="New Patient Care Relationship",
+            message=f"Patient {patient.name} has selected you as their primary doctor."
+        )
+        db.add(doc_notif)
+
+    # Notify previous doctor (if any) that the patient updated their doctor selection
+    if prev_doctor_id:
+        prev_doc = db.query(Doctor).filter(Doctor.id == prev_doctor_id).first()
+        if prev_doc and prev_doc.user_id:
+            old_doc_notif = Notification(
+                user_id=prev_doc.user_id,
+                title="Patient Care Relationship Concluded",
+                message=f"Patient {patient.name} has chosen a new primary doctor. Access to new scans and requests has been revoked."
+            )
+            db.add(old_doc_notif)
+
+    # Audit log
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="PATIENT_CHANGE_DOCTOR" if prev_doctor_id else "PATIENT_SELECT_DOCTOR",
+        details=f"Patient {patient.name} (ID: {patient.id}) selected Dr. {doctor.name} (ID: {doctor.id}). Previous: {prev_doctor_id}"
+    )
+    db.add(audit)
+    db.commit()
+    db.refresh(patient)
+
+    return {
+        "message": f"Successfully selected Dr. {doctor.name} as your primary doctor.",
+        "assigned_doctor": doctor
+    }
+
+@router.get("/selected", response_model=Optional[DoctorOut])
+def get_selected_doctor(
+    current_user: User = Depends(require_role(["PATIENT"])),
+    db: Session = Depends(get_db)
+):
+    """
+    Returns the currently selected doctor for the logged-in patient.
+    """
+    patient = current_user.patient_profile
+    if not patient or not patient.assigned_doctor_id:
+        return None
+    return db.query(Doctor).filter(Doctor.id == patient.assigned_doctor_id).first()
+
 @router.post("/review", response_model=DoctorReviewOut)
 def review_scan_report(
     review_in: DoctorReviewCreate,
@@ -153,6 +286,7 @@ def review_scan_report(
 ):
     """
     Submits a clinical review (Diagnosis, Clinical Notes, Prescription, Medicines, Next Visit) for an AI report.
+    Enforces Doctor -> Patient Access Control (Rule 2).
     """
     doctor = current_user.doctor_profile
     if not doctor and current_user.role == "DOCTOR":
@@ -167,6 +301,14 @@ def review_scan_report(
     scan = db.query(MRIScan).filter(MRIScan.id == ai_report.scan_id).first()
     if not scan:
         raise HTTPException(status_code=404, detail="Associated MRI Scan not found.")
+
+    # Access control verification for Doctor
+    if current_user.role == "DOCTOR":
+        if not verify_doctor_patient_access(doctor, scan.patient_id, db, scan_id=scan.id):
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied. You are not authorized to review this patient's scan (No active authorized care relationship)."
+            )
 
     doctor_id = doctor.id if doctor else (scan.preferred_doctor_id or 1)
     scan.preferred_doctor_id = doctor_id
@@ -368,19 +510,7 @@ def book_patient_appointment(
     ).first()
 
     if not doctor:
-        doctor = db.query(Doctor).filter(Doctor.id == appt_in.doctor_id).first()
-        if doctor and not doctor.is_approved:
-            doctor.is_approved = True
-            db.commit()
-            db.refresh(doctor)
-
-    if not doctor:
-        raise HTTPException(status_code=404, detail="Selected doctor was not found or is unavailable.")
-
-    # Assign doctor to patient if not already set
-    if not patient.assigned_doctor_id:
-        patient.assigned_doctor_id = doctor.id
-        db.commit()
+        raise HTTPException(status_code=404, detail="Selected doctor was not found or is not approved by administrator.")
 
     if appt_in.appointment_date < datetime.utcnow() - timedelta(hours=24):
         raise HTTPException(status_code=400, detail="Appointment date and time must be in the future.")

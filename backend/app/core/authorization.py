@@ -48,58 +48,58 @@ def verify_doctor_patient_access(
 ) -> bool:
     """
     Centralized Doctor -> Patient Access Control Verification.
-    Doctor access is allowed ONLY IF the patient has specifically selected this doctor:
-      Rule 1: Patient selected this doctor for an MRI scan (preferred_doctor_id == doctor.id)
-      Rule 2: Patient scheduled an appointment with this doctor (Appointment.doctor_id == doctor.id)
-      Rule 3: Patient's assigned primary doctor is this doctor (Patient.assigned_doctor_id == doctor.id)
-      Rule 4: Patient has direct clinical messaging with this doctor (Message.doctor_id == doctor.id)
+    Doctor access is allowed ONLY IF an active authorized relationship exists:
+      Rule 1: Patient has explicitly selected this doctor (Patient.assigned_doctor_id == doctor.id)
+      Rule 2: Active scheduled or confirmed appointment with this doctor
+      Rule 3: Specific or active pending MRI scan explicitly assigned to this doctor
+    Note: Past messaging or past deselected relationships do NOT grant persistent access.
     """
     if not doctor or not patient_id:
         return False
 
-    from app.models.models import Patient, Message
+    from app.models.models import Patient, MRIScan, Appointment
 
-    # Rule 1: Assigned Doctor on preferred_doctor_id
-    scan_query = db.query(MRIScan).filter(
-        MRIScan.patient_id == patient_id,
-        MRIScan.preferred_doctor_id == doctor.id
-    )
-    if scan_id is not None:
-        scan_query = scan_query.filter(MRIScan.id == scan_id)
-
-    if scan_query.first() is not None:
-        return True
-
-    # Rule 2: Appointment Relationship
-    appt = db.query(Appointment).filter(
-        Appointment.patient_id == patient_id,
-        Appointment.doctor_id == doctor.id
-    ).first()
-    if appt is not None:
-        return True
-
-    # Rule 3: Patient Assigned Primary Doctor
+    # Rule 1: Patient explicitly selected this doctor
     pat = db.query(Patient).filter(Patient.id == patient_id).first()
-    if pat and getattr(pat, "assigned_doctor_id", None) == doctor.id:
+    if pat and pat.assigned_doctor_id == doctor.id:
         return True
 
-    # Rule 4: Direct Clinical Messaging Relationship
-    try:
-        has_msg = db.query(Message).filter(
-            Message.patient_id == patient_id,
-            Message.doctor_id == doctor.id
+    # Rule 2: Active scheduled or confirmed appointment
+    active_appt = db.query(Appointment).filter(
+        Appointment.patient_id == patient_id,
+        Appointment.doctor_id == doctor.id,
+        Appointment.status.in_(["SCHEDULED", "CONFIRMED"])
+    ).first()
+    if active_appt is not None:
+        return True
+
+    # Rule 3: Specific scan assigned to doctor, or active pending scan awaiting review
+    if scan_id is not None:
+        scan = db.query(MRIScan).filter(
+            MRIScan.id == scan_id,
+            MRIScan.patient_id == patient_id,
+            MRIScan.preferred_doctor_id == doctor.id
         ).first()
-        if has_msg is not None:
+        if scan is not None:
             return True
-    except Exception:
-        pass
+    else:
+        pending_scan = db.query(MRIScan).filter(
+            MRIScan.patient_id == patient_id,
+            MRIScan.preferred_doctor_id == doctor.id,
+            MRIScan.status.in_(["AI_COMPLETED", "UNDER_REVIEW"])
+        ).first()
+        if pending_scan is not None:
+            return True
 
     return False
 
 def get_doctor_authorized_patient_ids(doctor: Doctor, db: Session) -> Set[int]:
     """
-    High-performance pre-computation of all patient IDs authorized for a doctor.
-    Returns ONLY patients who specifically selected THIS doctor.
+    High-performance pre-computation of all patient IDs actively authorized for a doctor.
+    Returns ONLY patients who currently have an active relationship with THIS doctor:
+    1. Patient explicitly selected this doctor (Patient.assigned_doctor_id == doctor.id)
+    2. Active scheduled appointment (Appointment.status in ['SCHEDULED', 'CONFIRMED'])
+    3. Active pending scan directed to this doctor (MRIScan.status in ['AI_COMPLETED', 'UNDER_REVIEW'])
     """
     if not doctor:
         return set()
@@ -108,17 +108,23 @@ def get_doctor_authorized_patient_ids(doctor: Doctor, db: Session) -> Set[int]:
 
     authorized_ids: Set[int] = set()
 
-    # 1. Patients who selected this doctor for MRI scans
-    assigned_pat_tuples = db.query(MRIScan.patient_id).filter(MRIScan.preferred_doctor_id == doctor.id).all()
-    authorized_ids.update(p[0] for p in assigned_pat_tuples if p[0])
-
-    # 2. Patients who booked appointments with this doctor
-    appt_pat_tuples = db.query(Appointment.patient_id).filter(Appointment.doctor_id == doctor.id).all()
-    authorized_ids.update(p[0] for p in appt_pat_tuples if p[0])
-
-    # 3. Patients who have this doctor as their assigned primary neurologist
+    # 1. Patients who have this doctor as their explicitly assigned primary doctor
     primary_pat_tuples = db.query(Patient.id).filter(Patient.assigned_doctor_id == doctor.id).all()
     authorized_ids.update(p[0] for p in primary_pat_tuples if p[0])
+
+    # 2. Patients who have active scheduled appointments with this doctor
+    appt_pat_tuples = db.query(Appointment.patient_id).filter(
+        Appointment.doctor_id == doctor.id,
+        Appointment.status.in_(["SCHEDULED", "CONFIRMED"])
+    ).all()
+    authorized_ids.update(p[0] for p in appt_pat_tuples if p[0])
+
+    # 3. Patients who have active pending scans assigned to this doctor
+    scan_pat_tuples = db.query(MRIScan.patient_id).filter(
+        MRIScan.preferred_doctor_id == doctor.id,
+        MRIScan.status.in_(["AI_COMPLETED", "UNDER_REVIEW"])
+    ).all()
+    authorized_ids.update(p[0] for p in scan_pat_tuples if p[0])
 
     return authorized_ids
 
@@ -127,7 +133,7 @@ def get_authorized_scans(current_user, db: Session):
     Centralized helper returning MRIScan objects authorized for the logged-in user.
     - Admin: All scans across the hospital system.
     - Patient: Scans belonging to patient directly.
-    - Doctor: ONLY scans belonging to patients who selected this doctor, or assigned to this doctor.
+    - Doctor: ONLY scans belonging to patients who actively selected this doctor.
     """
     from app.models.models import MRIScan, Doctor
 
@@ -150,11 +156,11 @@ def get_authorized_scans(current_user, db: Session):
 
         authorized_patient_ids = get_doctor_authorized_patient_ids(doctor, db)
         if not authorized_patient_ids:
-            return db.query(MRIScan).filter(MRIScan.preferred_doctor_id == doctor.id).order_by(MRIScan.upload_date.desc()).all()
+            return []
 
         return db.query(MRIScan).filter(
-            (MRIScan.preferred_doctor_id == doctor.id) |
-            (MRIScan.patient_id.in_(authorized_patient_ids))
+            MRIScan.patient_id.in_(authorized_patient_ids),
+            (MRIScan.preferred_doctor_id == doctor.id) | (MRIScan.preferred_doctor_id.is_(None))
         ).order_by(MRIScan.upload_date.desc()).all()
 
     return []
@@ -163,7 +169,7 @@ def get_authorized_patients(current_user, db: Session):
     """
     Centralized helper returning Patient objects authorized for the logged-in user.
     - Admin: All patients.
-    - Doctor: ONLY patients who specifically selected this doctor.
+    - Doctor: ONLY patients who specifically selected this doctor or have active care.
     """
     from app.models.models import Patient, Doctor
 

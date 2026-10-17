@@ -140,21 +140,22 @@ async def upload_and_predict_mri(
             os.remove(mri_file_path)
         raise HTTPException(status_code=422, detail=f"Image processing failed: {str(e)}")
 
-    # Auto-assign an approved doctor if none explicitly selected by patient
-    if not preferred_doctor_id:
-        if patient and getattr(patient, "assigned_doctor_id", None):
-            preferred_doctor_id = patient.assigned_doctor_id
-        else:
-            assigned_doc = db.query(Doctor).filter(Doctor.is_approved == True).first()
-            if assigned_doc:
-                preferred_doctor_id = assigned_doc.id
-
-    if patient and preferred_doctor_id:
-        patient.assigned_doctor_id = preferred_doctor_id
+    # Doctor selection for scan:
+    # If preferred_doctor_id is explicitly passed, validate that the doctor is approved.
+    # Otherwise, use patient's explicitly assigned doctor (if any).
+    # DO NOT auto-assign a doctor if the patient has not selected one.
+    selected_doc_id = None
+    if preferred_doctor_id:
+        doc = db.query(Doctor).filter(Doctor.id == preferred_doctor_id, Doctor.is_approved == True).first()
+        if not doc:
+            raise HTTPException(status_code=400, detail="Specified doctor was not found or is not approved.")
+        selected_doc_id = doc.id
+    elif patient and getattr(patient, "assigned_doctor_id", None):
+        selected_doc_id = patient.assigned_doctor_id
 
     mri_scan = MRIScan(
         patient_id=patient_id,
-        preferred_doctor_id=preferred_doctor_id,
+        preferred_doctor_id=selected_doc_id,
         original_filename=file.filename,
         file_path=f"/uploads/mri/{sanitized_filename}",
         upload_date=datetime.utcnow(),
@@ -189,36 +190,6 @@ async def upload_and_predict_mri(
     db.commit()
     db.refresh(ai_report)
 
-    # Automated Clinical Review Guidance Generation
-    assigned_doctor = db.query(Doctor).filter(Doctor.id == preferred_doctor_id).first() if preferred_doctor_id else None
-    doc_id = assigned_doctor.id if assigned_doctor else 1
-
-    if tumor_type != "No Tumor":
-        initial_diag = f"AI Classification: {tumor_type} lesion detected ({confidence}% confidence)."
-        initial_notes = f"Spatial neural activations confirm focal anomaly matching {tumor_type} characteristics."
-        initial_rx = f"Recommended immediate consultation for {tumor_type} therapeutic protocol."
-        initial_tests = "Contrast-enhanced MRI, Complete Blood Count (CBC)"
-        initial_meds = "Symptomatic relief & clinical evaluation"
-    else:
-        initial_diag = "Normal Brain MRI Study (No Tumor Detected)."
-        initial_notes = "No abnormal tissue mass or focal lesion observed in spatial feature maps."
-        initial_rx = "Routine health monitoring and wellness maintenance."
-        initial_tests = "Annual Medical Evaluation"
-        initial_meds = "None"
-
-    initial_review = DoctorReview(
-        report_id=ai_report.id,
-        doctor_id=doc_id,
-        clinical_notes=initial_notes,
-        diagnosis=initial_diag,
-        prescription=initial_rx,
-        suggested_tests=initial_tests,
-        medicines=initial_meds,
-        next_visit_date="In 3 Weeks",
-        status=ScanStatus.APPROVED.value
-    )
-    db.add(initial_review)
-
     notif = Notification(
         user_id=current_user.id,
         title="MRI Scan Analyzed",
@@ -226,14 +197,16 @@ async def upload_and_predict_mri(
     )
     db.add(notif)
 
-    # Notify ONLY the specific assigned doctor
-    if assigned_doctor and assigned_doctor.user_id:
-        doc_notif = Notification(
-            user_id=assigned_doctor.user_id,
-            title="New Patient Scan Assigned",
-            message=f"Patient #{patient_id} has assigned scan #{mri_scan.id} to you for review."
-        )
-        db.add(doc_notif)
+    # Notify ONLY the specific assigned doctor (if selected by patient)
+    if selected_doc_id:
+        assigned_doctor = db.query(Doctor).filter(Doctor.id == selected_doc_id).first()
+        if assigned_doctor and assigned_doctor.user_id:
+            doc_notif = Notification(
+                user_id=assigned_doctor.user_id,
+                title="New Patient Scan Assigned",
+                message=f"Patient #{patient_id} has assigned scan #{mri_scan.id} to you for review."
+            )
+            db.add(doc_notif)
 
     audit = AuditLog(
         user_id=current_user.id,

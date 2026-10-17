@@ -35,6 +35,8 @@ const PatientDashboard = () => {
   const [selectedCityFilter, setSelectedCityFilter] = useState('All');
   const [selectedActiveVideo, setSelectedActiveVideo] = useState(null);
   const [faqSearchInput, setFaqSearchInput] = useState('');
+  const [selectedDoctor, setSelectedDoctor] = useState(null);
+  const [selectingDoctorId, setSelectingDoctorId] = useState(null);
 
   // Appointment Booking State
   const [myAppointments, setMyAppointments] = useState([]);
@@ -80,12 +82,13 @@ const PatientDashboard = () => {
       setPatientScansList(scansResponse.data);
 
       // Pre-fetch Content & Public Doctors by Location
-      const [dietRes, videoRes, faqRes, docRes, locRes] = await Promise.all([
+      const [dietRes, videoRes, faqRes, docRes, locRes, selDocRes] = await Promise.all([
         contentAPI.getDiets(),
         contentAPI.getVideos(),
         contentAPI.getFAQs(),
         doctorAPI.getPublicDoctors('All'),
-        doctorAPI.getLocations()
+        doctorAPI.getLocations(),
+        doctorAPI.getSelectedDoctor().catch(() => ({ data: null }))
       ]);
 
       setDietPlansList(dietRes.data || []);
@@ -93,10 +96,31 @@ const PatientDashboard = () => {
       setFaqDirectoryList(faqRes.data || []);
       setPublicDoctorsList(docRes.data || []);
       setAvailableLocationsList(locRes.data?.locations || []);
+      setSelectedDoctor(selDocRes.data || null);
     } catch (err) {
       console.error("Patient dashboard fetch error:", err);
     } finally {
       setLoadingStatus(false);
+    }
+  };
+
+  const handleSelectDoctor = async (docItem) => {
+    setSelectingDoctorId(docItem.id);
+    try {
+      await doctorAPI.selectDoctor(docItem.id);
+      setSelectedDoctor(docItem);
+      setToastNotification({
+        message: `Successfully selected Dr. ${docItem.name} as your primary doctor.`,
+        type: "success"
+      });
+      await loadDashboardData();
+    } catch (err) {
+      setToastNotification({
+        message: err.response?.data?.detail || "Failed to select doctor.",
+        type: "error"
+      });
+    } finally {
+      setSelectingDoctorId(null);
     }
   };
 
@@ -205,6 +229,67 @@ const PatientDashboard = () => {
                   <span>Upload MRI Scan</span>
                 </button>
               </div>
+
+              {/* Selected Primary Doctor Status Card */}
+              {selectedDoctor ? (
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-xl bg-blue-600 text-white font-bold flex items-center justify-center text-lg shadow-sm">
+                      {selectedDoctor.name ? selectedDoctor.name[0] : 'D'}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                          Your Selected Primary Doctor
+                        </span>
+                        <span className="text-xs text-green-700 font-semibold flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-green-600" /> Authorized
+                        </span>
+                      </div>
+                      <h2 className="text-base font-bold text-gray-900 mt-0.5">
+                        {selectedDoctor.name.startsWith("Dr.") ? selectedDoctor.name : `Dr. ${selectedDoctor.name}`}
+                      </h2>
+                      <p className="text-xs text-gray-600">
+                        {selectedDoctor.specialization} • {selectedDoctor.hospital} ({selectedDoctor.city || selectedDoctor.location})
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <button
+                      onClick={() => setCurrentTab('messages')}
+                      className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" /> Message Doctor
+                    </button>
+                    <button
+                      onClick={() => setCurrentTab('doctors')}
+                      className="px-3.5 py-2 bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
+                    >
+                      Change Doctor
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-amber-500 text-white flex items-center justify-center shadow-sm">
+                      <Stethoscope className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-900">No Doctor Selected</h3>
+                      <p className="text-xs text-gray-600">
+                        Select an administrator-approved doctor from our directory to receive verified clinical reviews and direct consultations.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setCurrentTab('doctors')}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm whitespace-nowrap"
+                  >
+                    Select a Doctor
+                  </button>
+                </div>
+              )}
 
               {/* Top Metrics Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -338,15 +423,20 @@ const PatientDashboard = () => {
                       >
                         <Calendar className="w-3.5 h-3.5" /> Book Appointment
                       </button>
-                      <button
-                        onClick={() => {
-                          setCurrentTab('upload');
-                          setToastNotification({ message: `Selected ${docItem.name} for MRI scan review!`, type: "info" });
-                        }}
-                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold text-xs flex items-center gap-1 shadow-sm"
-                      >
-                        <Stethoscope className="w-3.5 h-3.5" /> Select for Upload Review
-                      </button>
+                      {selectedDoctor?.id === docItem.id ? (
+                        <span className="px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded font-bold text-xs flex items-center gap-1 shadow-sm">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-green-600" /> Current Selected Doctor
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleSelectDoctor(docItem)}
+                          disabled={selectingDoctorId === docItem.id}
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-semibold text-xs flex items-center gap-1 shadow-sm disabled:opacity-50 transition-colors"
+                        >
+                          <Stethoscope className="w-3.5 h-3.5" />
+                          {selectingDoctorId === docItem.id ? "Selecting..." : selectedDoctor ? "Change to this Doctor" : "Select as My Doctor"}
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

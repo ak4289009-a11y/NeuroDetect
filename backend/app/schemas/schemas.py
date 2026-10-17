@@ -50,20 +50,6 @@ class PatientRegister(BaseModel):
     medical_history: Optional[str] = None
     otp_code: Optional[str] = None
 
-class PatientOut(BaseModel):
-    id: int
-    user_id: int
-    assigned_doctor_id: Optional[int] = None
-    name: str
-    age: int
-    gender: str
-    phone: str
-    address: Optional[str] = None
-    medical_history: Optional[str] = None
-
-    class Config:
-        from_attributes = True
-
 # Doctor Profile Schemas
 class DoctorCreate(BaseModel):
     name: str
@@ -90,6 +76,24 @@ class DoctorOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class PatientOut(BaseModel):
+    id: int
+    user_id: int
+    assigned_doctor_id: Optional[int] = None
+    name: str
+    age: int
+    gender: str
+    phone: str
+    address: Optional[str] = None
+    medical_history: Optional[str] = None
+    assigned_doctor: Optional[DoctorOut] = None
+
+    class Config:
+        from_attributes = True
+
+class DoctorSelectRequest(BaseModel):
+    doctor_id: Optional[int] = None
 
 class UserOut(UserBase):
     id: int
@@ -271,8 +275,8 @@ class ChatMessageOut(BaseModel):
     id: int
     sender_user_id: int
     receiver_user_id: int
-    patient_id: int
-    doctor_id: int
+    patient_id: Optional[int] = None
+    doctor_id: Optional[int] = None
     message_text: str
     created_at: datetime
     read_at: Optional[datetime] = None
