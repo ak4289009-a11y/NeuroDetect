@@ -34,6 +34,8 @@ const DoctorDashboard = () => {
   const [searchReportInput, setSearchReportInput] = useState('');
   const [reportsDiagnosisFilter, setReportsDiagnosisFilter] = useState('ALL');
   const [reportsStatusFilter, setReportsStatusFilter] = useState('ALL');
+  const [apptStatusFilter, setApptStatusFilter] = useState('ALL');
+  const [searchApptInput, setSearchApptInput] = useState('');
   const [expandedReportPatientIds, setExpandedReportPatientIds] = useState(new Set());
   const [patientHistoryPage, setPatientHistoryPage] = useState(1);
   const [collapsedPatientIds, setCollapsedPatientIds] = useState(new Set());
@@ -80,11 +82,15 @@ const DoctorDashboard = () => {
   };
 
   useEffect(() => {
-    fetchDoctorData();
+    fetchDoctorData(true);
+    const interval = setInterval(() => {
+      fetchDoctorData(false);
+    }, 10000);
+    return () => clearInterval(interval);
   }, []);
 
-  const fetchDoctorData = async () => {
-    setLoading(true);
+  const fetchDoctorData = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const results = await Promise.allSettled([
         analyticsAPI.getDashboardStats(),
@@ -113,9 +119,11 @@ const DoctorDashboard = () => {
     } catch (err) {
       console.error("Doctor dashboard fetch error:", err);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
+
+  const pendingAppointments = appointments.filter(a => a.status === 'SCHEDULED');
 
   const handleOpenReview = (scan) => {
     setSelectedScan(scan);
@@ -166,11 +174,46 @@ const DoctorDashboard = () => {
     : allScans.filter(s => s.ai_report?.tumor_type?.toLowerCase() === selectedTumorFilter.toLowerCase());
 
   const getAppointmentDetails = (patientId) => {
-    const appt = appointments.find(a => Number(a.patient_id) === Number(patientId));
-    if (appt) {
-      return { date: appt.appointment_date_formatted || appt.appointment_date || 'Scheduled' };
+    const activeAppts = appointments.filter(
+      a => Number(a.patient_id) === Number(patientId) && a.status !== 'CANCELLED'
+    );
+    if (activeAppts.length > 0) {
+      const latest = activeAppts[activeAppts.length - 1];
+      return { 
+        date: latest.appointment_date_formatted || latest.appointment_date || 'Scheduled',
+        status: latest.status 
+      };
     }
-    return { date: 'Not Scheduled' };
+    const anyAppt = appointments.find(a => Number(a.patient_id) === Number(patientId));
+    if (anyAppt && anyAppt.status === 'CANCELLED') {
+      return { date: 'Cancelled', status: 'CANCELLED' };
+    }
+    return { date: 'Not Scheduled', status: 'NONE' };
+  };
+
+  const handleUpdateAppointmentStatus = async (apptId, newStatus) => {
+    try {
+      await doctorAPI.updateAppointmentStatus(apptId, newStatus);
+      setToast({ message: `Appointment marked as ${newStatus}!`, type: "success" });
+      fetchDoctorData();
+    } catch (err) {
+      console.error("Update appointment status error:", err);
+      const msg = err.response?.data?.detail || "Failed to update appointment status.";
+      setToast({ message: msg, type: "error" });
+    }
+  };
+
+  const handleDoctorCancelAppointment = async (apptId) => {
+    if (!window.confirm("Are you sure you want to cancel this appointment?")) return;
+    try {
+      await doctorAPI.cancelAppointment(apptId);
+      setToast({ message: "Appointment cancelled successfully.", type: "info" });
+      fetchDoctorData();
+    } catch (err) {
+      console.error("Cancel appointment error:", err);
+      const msg = err.response?.data?.detail || "Failed to cancel appointment.";
+      setToast({ message: msg, type: "error" });
+    }
   };
 
 
@@ -180,44 +223,84 @@ const DoctorDashboard = () => {
       <Navbar />
 
       <div className="flex-1 flex flex-col lg:flex-row max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 gap-4 sm:gap-6">
-        <Sidebar currentTab={currentTab} setCurrentTab={setCurrentTab} />
+        <Sidebar currentTab={currentTab} setCurrentTab={setCurrentTab} pendingApptsCount={pendingAppointments.length} />
 
         <main className="flex-1 min-w-0 space-y-6">
           
           {/* TAB 1: DASHBOARD OVERVIEW */}
           {currentTab === 'dashboard' && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">Doctor Clinical Control Panel</h1>
                   <p className="text-xs text-gray-500">Welcome, {user?.doctor_profile?.name || 'Dr. Specialist'}</p>
                 </div>
-                <button
-                  onClick={() => setCurrentTab('pending-scans')}
-                  className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs flex items-center gap-1.5 shadow-sm"
-                >
-                  <ListChecks className="w-4 h-4" />
-                  <span>Review Pending Queue ({pendingScans.length})</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentTab('patients')}
+                    className={`px-3 py-1.5 rounded-lg font-medium text-xs flex items-center gap-1.5 shadow-sm transition-all ${
+                      pendingAppointments.length > 0
+                        ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-200'
+                        : 'bg-white border border-gray-200 hover:bg-gray-100 text-gray-700'
+                    }`}
+                  >
+                    <Calendar className="w-4 h-4" />
+                    <span>Appointment Requests ({pendingAppointments.length})</span>
+                  </button>
+                  <button
+                    onClick={() => setCurrentTab('pending-scans')}
+                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs flex items-center gap-1.5 shadow-sm"
+                  >
+                    <ListChecks className="w-4 h-4" />
+                    <span>Review Clinical Queue ({pendingAppointments.length + pendingScans.length})</span>
+                  </button>
+                </div>
               </div>
 
               {/* Metrics Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4">
                 <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm space-y-1">
-                  <span className="text-xs font-semibold text-gray-500">Total Registered Patients</span>
-                  <p className="text-2xl font-bold text-gray-900">{patients.length || stats?.todays_patients || 0}</p>
+                  <span className="text-xs font-semibold text-gray-500">Registered Patients</span>
+                  <p className="text-2xl font-bold text-gray-900">{activePatientsCount || patients.length || stats?.todays_patients || 0}</p>
+                  <span className="text-[10px] text-gray-400">Total in your roster</span>
                 </div>
-                <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm space-y-1">
-                  <span className="text-xs font-semibold text-gray-500">Pending Reviews Queue</span>
-                  <p className="text-2xl font-bold text-amber-600">{pendingScans.length}</p>
+                <div 
+                  onClick={() => setCurrentTab('patients')}
+                  className={`bg-white border rounded-lg p-4 shadow-sm space-y-1 cursor-pointer transition-all hover:shadow ${
+                    pendingAppointments.length > 0 ? 'border-amber-300 bg-amber-50/30 hover:border-amber-400' : 'border-gray-200 hover:border-blue-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-gray-500">Appointment Requests</span>
+                    {pendingAppointments.length > 0 && (
+                      <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.2 rounded">
+                        Action Needed
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-2xl font-bold text-amber-600">{pendingAppointments.length}</p>
+                  <span className="text-[10px] text-gray-400">{appointments.length} total scheduled</span>
                 </div>
-                <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm space-y-1">
+                <div 
+                  onClick={() => setCurrentTab('pending-scans')}
+                  className="bg-white border border-gray-200 hover:border-blue-300 rounded-lg p-4 shadow-sm space-y-1 cursor-pointer transition-all hover:shadow"
+                >
+                  <span className="text-xs font-semibold text-gray-500">Pending Scan Reviews</span>
+                  <p className="text-2xl font-bold text-blue-600">{pendingScans.length}</p>
+                  <span className="text-[10px] text-gray-400">Scans awaiting signoff</span>
+                </div>
+                <div 
+                  onClick={() => setCurrentTab('reports')}
+                  className="bg-white border border-gray-200 hover:border-blue-300 rounded-lg p-4 shadow-sm space-y-1 cursor-pointer transition-all hover:shadow"
+                >
                   <span className="text-xs font-semibold text-gray-500">Completed Reports</span>
                   <p className="text-2xl font-bold text-green-600">{allScans.filter(s => s.status === 'APPROVED').length}</p>
+                  <span className="text-[10px] text-gray-400">Approved consultations</span>
                 </div>
-                <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm space-y-1">
-                  <span className="text-xs font-semibold text-gray-500">DenseNet121 Model Accuracy</span>
+                <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm space-y-1 col-span-2 lg:col-span-1">
+                  <span className="text-xs font-semibold text-gray-500">Model Accuracy</span>
                   <p className="text-2xl font-bold text-blue-600">{stats?.average_confidence || 95.8}%</p>
+                  <span className="text-[10px] text-gray-400">DenseNet121 Ensemble</span>
                 </div>
               </div>
 
@@ -381,6 +464,126 @@ const DoctorDashboard = () => {
                 </div>
               )}
 
+              {/* Incoming Patient Appointment Requests Widget */}
+              <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
+                      <Calendar className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-900 text-sm">Incoming Patient Appointment Requests</h3>
+                      <p className="text-[11px] text-gray-500">Real-time clinical consultation bookings requested by patients</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-semibold px-2.5 py-0.5 rounded border ${
+                      pendingAppointments.length > 0 
+                        ? 'bg-amber-50 text-amber-800 border-amber-200 font-bold' 
+                        : 'bg-green-50 text-green-700 border-green-200'
+                    }`}>
+                      {pendingAppointments.length > 0 
+                        ? `${pendingAppointments.length} Requests Awaiting Action` 
+                        : 'All Requests Handled'}
+                    </span>
+                    <button
+                      onClick={() => setCurrentTab('patients')}
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                    >
+                      <span>View All Roster ({appointments.length})</span>
+                    </button>
+                  </div>
+                </div>
+
+                {pendingAppointments.length === 0 ? (
+                  <div className="p-6 text-center text-gray-500 text-xs bg-gray-50/50 rounded-lg border border-dashed border-gray-200 space-y-1">
+                    <p className="font-semibold text-gray-700">No pending appointment requests</p>
+                    <p className="text-gray-400">All patient consultation requests for your profile are up to date.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="table-academic">
+                      <thead>
+                        <tr>
+                          <th>Patient ID</th>
+                          <th>Patient Name</th>
+                          <th>Age / Gender</th>
+                          <th>Phone</th>
+                          <th>Requested Date & Time</th>
+                          <th>Reason / Symptoms</th>
+                          <th>Diagnosis</th>
+                          <th>Status</th>
+                          <th className="text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pendingAppointments.map((appt) => {
+                          const diag = appt.diagnosis || 'Not yet analyzed';
+                          return (
+                            <tr key={appt.id} className="hover:bg-amber-50/30 transition-colors">
+                              <td className="font-mono font-bold text-blue-700">PT-{appt.patient_id}</td>
+                              <td className="font-semibold text-gray-900">{appt.patient_name || 'Patient'}</td>
+                              <td>{appt.age ? `${appt.age} yrs` : 'N/A'} / {appt.gender || 'N/A'}</td>
+                              <td>{appt.phone || 'N/A'}</td>
+                              <td className="font-semibold text-blue-700 whitespace-nowrap">
+                                <div className="flex items-center gap-1.5">
+                                  <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                                  <span>{appt.appointment_date_formatted || appt.appointment_date}</span>
+                                </div>
+                              </td>
+                              <td className="max-w-[200px] truncate" title={appt.notes || 'Clinical Consultation'}>
+                                {appt.notes || 'Clinical Consultation'}
+                              </td>
+                              <td>
+                                <span className={`px-2 py-0.5 rounded text-[11px] font-bold border ${
+                                  diag === 'No Tumor' ? 'bg-green-50 text-green-700 border-green-200'
+                                  : diag === 'Glioma' ? 'bg-red-50 text-red-700 border-red-200'
+                                  : diag === 'Not yet analyzed' ? 'bg-gray-100 text-gray-600 border-gray-200 font-normal'
+                                  : 'bg-amber-50 text-amber-700 border-amber-200'
+                                }`}>
+                                  {diag}
+                                </span>
+                              </td>
+                              <td>
+                                <span className="px-2 py-0.5 rounded text-[11px] font-bold border bg-amber-50 text-amber-800 border-amber-200">
+                                  {appt.status}
+                                </span>
+                              </td>
+                              <td className="text-right">
+                                <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                                  <button
+                                    onClick={() => handleUpdateAppointmentStatus(appt.id, 'CONFIRMED')}
+                                    className="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-[11px] font-semibold transition-colors shadow-xs"
+                                    title="Confirm appointment request"
+                                  >
+                                    Confirm
+                                  </button>
+                                  <button
+                                    onClick={() => handleDoctorCancelAppointment(appt.id)}
+                                    className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded text-[11px] font-semibold transition-colors"
+                                    title="Decline appointment request"
+                                  >
+                                    Decline
+                                  </button>
+                                  <button
+                                    onClick={() => setCurrentTab('messages')}
+                                    className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-[11px] font-semibold flex items-center gap-1 transition-colors"
+                                    title="Open clinical messaging"
+                                  >
+                                    <MessageSquare className="w-3 h-3 text-blue-600" />
+                                    <span>Chat</span>
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
               {/* Pending Queue Table */}
               <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm space-y-3">
                 <div className="flex items-center justify-between">
@@ -427,71 +630,216 @@ const DoctorDashboard = () => {
             </div>
           )}
 
-          {/* TAB 2: PENDING REPORTS */}
+          {/* TAB 2: CLINICAL QUEUE (APPOINTMENTS & SCANS) */}
           {currentTab === 'pending-scans' && (
-            <div className="space-y-5">
-              <h1 className="text-xl font-bold text-gray-900">Pending Scan Reviews Queue</h1>
-              <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
-                {pendingScans.length === 0 ? (
-                  <div className="p-6 text-center text-gray-500 text-xs font-medium">No pending scan reviews in queue. All patient scans have been verified!</div>
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">Doctor Clinical Action Queue</h1>
+                  <p className="text-xs text-gray-500">Review pending patient consultation requests and verified diagnostic MRI scan queue</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-amber-800 bg-amber-100 px-3 py-1 rounded-full border border-amber-300">
+                    {pendingAppointments.length} Appointments Pending
+                  </span>
+                  <span className="text-xs font-bold text-blue-800 bg-blue-100 px-3 py-1 rounded-full border border-blue-300">
+                    {pendingScans.length} Scans Pending
+                  </span>
+                </div>
+              </div>
+
+              {/* 1. Patient Appointment Requests Queue */}
+              <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
+                      <Calendar className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-900 text-sm">Patient Consultation & Appointment Requests</h3>
+                      <p className="text-[11px] text-gray-500">Incoming patient appointment bookings awaiting doctor confirmation</p>
+                    </div>
+                  </div>
+                  <span className={`text-xs font-semibold px-2.5 py-0.5 rounded border ${
+                    pendingAppointments.length > 0 
+                      ? 'bg-amber-50 text-amber-800 border-amber-200 font-bold' 
+                      : 'bg-green-50 text-green-700 border-green-200'
+                  }`}>
+                    {pendingAppointments.length > 0 ? `${pendingAppointments.length} Requests Awaiting Review` : 'No Pending Requests'}
+                  </span>
+                </div>
+
+                {pendingAppointments.length === 0 ? (
+                  <div className="p-6 text-center text-gray-500 text-xs bg-gray-50/50 rounded-lg border border-dashed border-gray-200 space-y-1">
+                    <p className="font-semibold text-gray-700">No pending appointment requests in queue</p>
+                    <p className="text-gray-400">All patient consultation requests have been attended to.</p>
+                  </div>
                 ) : (
-                  <table className="table-academic">
-                    <thead>
-                      <tr>
-                        <th>PATIENT</th>
-                        <th>MRI SCAN</th>
-                        <th>AI PREDICTION</th>
-                        <th>CONFIDENCE</th>
-                        <th>STATUS</th>
-                        <th>ACTION</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pendingScans.map((scan) => {
-                        const patObj = scan.patient || patients.find(p => p.id === scan.patient_id) || { id: scan.patient_id, name: `Patient #${scan.patient_id}`, age: 0, gender: 'N/A' };
-                        const uploadDateFormatted = new Date(scan.upload_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                        return (
-                          <tr key={scan.id}>
-                            <td className="space-y-0.5">
-                              <div className="font-bold text-sm text-gray-900">{patObj.name}</div>
-                              <div className="font-mono text-xs font-bold text-blue-700">PT-{patObj.id}</div>
-                              <div className="text-xs text-gray-500 font-medium">{patObj.age} yrs • {patObj.gender}</div>
-                            </td>
-                            <td className="space-y-0.5">
-                              <div className="font-medium text-xs text-gray-800 font-mono truncate max-w-xs">{scan.original_filename}</div>
-                              <div className="text-xs text-gray-500 flex items-center gap-1 font-medium">
-                                <Calendar className="w-3 h-3 text-gray-400 shrink-0" />
-                                <span>{uploadDateFormatted}</span>
-                              </div>
-                            </td>
-                            <td>
-                              <span className={`px-2.5 py-0.5 rounded text-xs font-bold border ${
-                                scan.ai_report?.tumor_type === 'No Tumor' ? 'bg-green-50 text-green-700 border-green-200'
-                                : scan.ai_report?.tumor_type === 'Glioma' ? 'bg-red-50 text-red-700 border-red-200'
-                                : 'bg-amber-50 text-amber-700 border-amber-200'
-                              }`}>
-                                {scan.ai_report?.tumor_type || 'Processing'}
-                              </span>
-                            </td>
-                            <td className="font-bold text-xs">{scan.ai_report?.confidence ? `${scan.ai_report.confidence}%` : 'N/A'}</td>
-                            <td>
-                              <span className="px-2 py-0.5 rounded text-xs bg-amber-50 text-amber-700 font-bold border border-amber-200">
-                                {scan.status}
-                              </span>
-                            </td>
-                            <td>
-                              <button
-                                onClick={() => handleOpenReview(scan)}
-                                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-sm transition-colors"
-                              >
-                                Review Scan
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                  <div className="overflow-x-auto">
+                    <table className="table-academic">
+                      <thead>
+                        <tr>
+                          <th>Patient ID</th>
+                          <th>Patient Name</th>
+                          <th>Age / Gender</th>
+                          <th>Phone</th>
+                          <th>Requested Date & Time</th>
+                          <th>Reason / Notes</th>
+                          <th>Diagnosis</th>
+                          <th>Status</th>
+                          <th className="text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pendingAppointments.map((appt) => {
+                          const diag = appt.diagnosis || 'Not yet analyzed';
+                          return (
+                            <tr key={appt.id} className="hover:bg-amber-50/30 transition-colors">
+                              <td className="font-mono font-bold text-blue-700">PT-{appt.patient_id}</td>
+                              <td className="font-semibold text-gray-900">{appt.patient_name || 'Patient'}</td>
+                              <td>{appt.age ? `${appt.age} yrs` : 'N/A'} / {appt.gender || 'N/A'}</td>
+                              <td>{appt.phone || 'N/A'}</td>
+                              <td className="font-semibold text-blue-700 whitespace-nowrap">
+                                <div className="flex items-center gap-1.5">
+                                  <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                                  <span>{appt.appointment_date_formatted || appt.appointment_date}</span>
+                                </div>
+                              </td>
+                              <td className="max-w-[200px] truncate" title={appt.notes || 'Clinical Consultation'}>
+                                {appt.notes || 'Clinical Consultation'}
+                              </td>
+                              <td>
+                                <span className={`px-2 py-0.5 rounded text-[11px] font-bold border ${
+                                  diag === 'No Tumor' ? 'bg-green-50 text-green-700 border-green-200'
+                                  : diag === 'Glioma' ? 'bg-red-50 text-red-700 border-red-200'
+                                  : diag === 'Not yet analyzed' ? 'bg-gray-100 text-gray-600 border-gray-200 font-normal'
+                                  : 'bg-amber-50 text-amber-700 border-amber-200'
+                                }`}>
+                                  {diag}
+                                </span>
+                              </td>
+                              <td>
+                                <span className="px-2 py-0.5 rounded text-[11px] font-bold border bg-amber-50 text-amber-800 border-amber-200">
+                                  {appt.status}
+                                </span>
+                              </td>
+                              <td className="text-right">
+                                <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                                  <button
+                                    onClick={() => handleUpdateAppointmentStatus(appt.id, 'CONFIRMED')}
+                                    className="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-[11px] font-semibold transition-colors shadow-xs"
+                                    title="Confirm appointment request"
+                                  >
+                                    Confirm
+                                  </button>
+                                  <button
+                                    onClick={() => handleDoctorCancelAppointment(appt.id)}
+                                    className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded text-[11px] font-semibold transition-colors"
+                                    title="Decline appointment request"
+                                  >
+                                    Decline
+                                  </button>
+                                  <button
+                                    onClick={() => setCurrentTab('messages')}
+                                    className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-[11px] font-semibold flex items-center gap-1 transition-colors"
+                                    title="Open clinical messaging"
+                                  >
+                                    <MessageSquare className="w-3 h-3 text-blue-600" />
+                                    <span>Chat</span>
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* 2. Pending MRI Scan Reviews Queue */}
+              <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+                      <Brain className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-900 text-sm">MRI Scan Verification Queue</h3>
+                      <p className="text-[11px] text-gray-500">Patient scans awaiting AI report signoff and clinical prescription</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded border border-blue-200">
+                    {pendingScans.length} Scans Awaiting Verification
+                  </span>
+                </div>
+
+                {pendingScans.length === 0 ? (
+                  <div className="p-6 text-center text-gray-500 text-xs bg-gray-50/50 rounded-lg border border-dashed border-gray-200 space-y-1">
+                    <p className="font-semibold text-gray-700">No pending scan reviews in queue</p>
+                    <p className="text-gray-400">All patient MRI scans for your profile have been verified.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="table-academic">
+                      <thead>
+                        <tr>
+                          <th>PATIENT</th>
+                          <th>MRI SCAN</th>
+                          <th>AI PREDICTION</th>
+                          <th>CONFIDENCE</th>
+                          <th>STATUS</th>
+                          <th className="text-right">ACTION</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pendingScans.map((scan) => {
+                          const patObj = scan.patient || patients.find(p => p.id === scan.patient_id) || { id: scan.patient_id, name: `Patient #${scan.patient_id}`, age: 0, gender: 'N/A' };
+                          const uploadDateFormatted = new Date(scan.upload_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                          return (
+                            <tr key={scan.id}>
+                              <td className="space-y-0.5">
+                                <div className="font-bold text-sm text-gray-900">{patObj.name}</div>
+                                <div className="font-mono text-xs font-bold text-blue-700">PT-{patObj.id}</div>
+                                <div className="text-xs text-gray-500 font-medium">{patObj.age} yrs • {patObj.gender}</div>
+                              </td>
+                              <td className="space-y-0.5">
+                                <div className="font-medium text-xs text-gray-800 font-mono truncate max-w-xs">{scan.original_filename}</div>
+                                <div className="text-xs text-gray-500 flex items-center gap-1 font-medium">
+                                  <Calendar className="w-3 h-3 text-gray-400 shrink-0" />
+                                  <span>{uploadDateFormatted}</span>
+                                </div>
+                              </td>
+                              <td>
+                                <span className={`px-2.5 py-0.5 rounded text-xs font-bold border ${
+                                  scan.ai_report?.tumor_type === 'No Tumor' ? 'bg-green-50 text-green-700 border-green-200'
+                                  : scan.ai_report?.tumor_type === 'Glioma' ? 'bg-red-50 text-red-700 border-red-200'
+                                  : 'bg-amber-50 text-amber-700 border-amber-200'
+                                }`}>
+                                  {scan.ai_report?.tumor_type || 'Processing'}
+                                </span>
+                              </td>
+                              <td className="font-bold text-xs">{scan.ai_report?.confidence ? `${scan.ai_report.confidence}%` : 'N/A'}</td>
+                              <td>
+                                <span className="px-2 py-0.5 rounded text-xs bg-amber-50 text-amber-700 font-bold border border-amber-200">
+                                  {scan.status}
+                                </span>
+                              </td>
+                              <td className="text-right">
+                                <button
+                                  onClick={() => handleOpenReview(scan)}
+                                  className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-sm transition-colors"
+                                >
+                                  Review Scan
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>
@@ -811,45 +1159,118 @@ const DoctorDashboard = () => {
           })()}
 
           {/* TAB 6: PATIENT ROSTER & APPOINTMENTS */}
-          {currentTab === 'patients' && (
-            <div className="space-y-5">
-              <div className="flex items-center justify-between">
-                <h1 className="text-xl font-bold text-gray-900">Patient Roster & Scheduled Appointments</h1>
-                <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
-                  {activePatientsCount} Active Patients
-                </span>
-              </div>
+          {currentTab === 'patients' && (() => {
+            const filteredAppointments = appointments.filter(a => {
+              if (apptStatusFilter !== 'ALL' && a.status !== apptStatusFilter) return false;
+              if (searchApptInput.trim()) {
+                const q = searchApptInput.toLowerCase().trim();
+                const nameMatch = (a.patient_name || '').toLowerCase().includes(q);
+                const phoneMatch = (a.phone || '').includes(q);
+                const idMatch = `pt-${a.patient_id}`.toLowerCase().includes(q);
+                const notesMatch = (a.notes || '').toLowerCase().includes(q);
+                return nameMatch || phoneMatch || idMatch || notesMatch;
+              }
+              return true;
+            });
 
-              <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
-                {appointments.length === 0 ? (
-                  <div className="p-8 text-center text-gray-500 text-xs font-medium">
-                    No appointments available.
+            return (
+              <div className="space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h1 className="text-xl font-bold text-gray-900">Patient Roster & Scheduled Appointments</h1>
+                    <p className="text-xs text-gray-500">Manage incoming consultation requests, confirmed visits, and patient history</p>
                   </div>
-                ) : (
-                  <table className="table-academic">
-                    <thead>
-                      <tr>
-                        <th>ID</th>
-                        <th>Patient Name</th>
-                        <th>Age / Gender</th>
-                        <th>Phone Number</th>
-                        <th>Appointment Date & Time</th>
-                        <th>Diagnosis Classification</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {appointments.map((appt) => {
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+                      {activePatientsCount} Active Patients
+                    </span>
+                    {pendingAppointments.length > 0 && (
+                      <span className="text-xs font-bold text-amber-800 bg-amber-100 px-3 py-1 rounded-full border border-amber-300">
+                        {pendingAppointments.length} Pending Approval
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Filter & Search Bar */}
+                <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-white p-4 border border-gray-200 rounded-xl shadow-sm text-xs">
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search patient name, phone, notes, or PT-ID..."
+                      value={searchApptInput}
+                      onChange={(e) => setSearchApptInput(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-xs"
+                    />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {[
+                      { id: 'ALL', label: 'All', count: appointments.length },
+                      { id: 'SCHEDULED', label: 'Pending Requests', count: pendingAppointments.length },
+                      { id: 'CONFIRMED', label: 'Confirmed', count: appointments.filter(a => a.status === 'CONFIRMED').length },
+                      { id: 'COMPLETED', label: 'Completed', count: appointments.filter(a => a.status === 'COMPLETED').length },
+                      { id: 'CANCELLED', label: 'Cancelled', count: appointments.filter(a => a.status === 'CANCELLED').length },
+                    ].map(tab => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setApptStatusFilter(tab.id)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                          apptStatusFilter === tab.id
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                        }`}
+                      >
+                        <span>{tab.label}</span>
+                        <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                          apptStatusFilter === tab.id ? 'bg-blue-700 text-white' : 'bg-gray-200 text-gray-700'
+                        }`}>
+                          {tab.count}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+                  {filteredAppointments.length === 0 ? (
+                    <div className="p-8 text-center text-gray-500 text-xs font-medium">
+                      No appointments matching selected filters.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="table-academic">
+                        <thead>
+                          <tr>
+                            <th>ID</th>
+                            <th>Patient Name</th>
+                            <th>Age / Gender</th>
+                            <th>Phone Number</th>
+                            <th>Appointment Date & Time</th>
+                            <th>Reason / Notes</th>
+                            <th>Diagnosis Classification</th>
+                            <th>Status</th>
+                            <th className="text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredAppointments.map((appt) => {
                         const diag = appt.diagnosis || 'Not yet analyzed';
                         return (
                           <tr key={appt.id}>
                             <td className="font-mono font-bold">PT-{appt.patient_id}</td>
-                            <td className="font-medium text-gray-900">{appt.patient_name}</td>
-                            <td>{appt.age} yrs / {appt.gender}</td>
-                            <td>{appt.phone}</td>
-                            <td className="font-semibold text-blue-700 flex items-center gap-1.5">
-                              <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                              <span>{appt.appointment_date_formatted}</span>
+                            <td className="font-medium text-gray-900">{appt.patient_name || 'Patient'}</td>
+                            <td>{appt.age ? `${appt.age} yrs` : 'N/A'} / {appt.gender || 'N/A'}</td>
+                            <td>{appt.phone || 'N/A'}</td>
+                            <td className="font-semibold text-blue-700">
+                              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                                <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                                <span>{appt.appointment_date_formatted || appt.appointment_date}</span>
+                              </div>
+                            </td>
+                            <td className="max-w-[180px] truncate" title={appt.notes || 'Clinical Consultation'}>
+                              {appt.notes || 'Clinical Consultation'}
                             </td>
                             <td>
                               <span className={`px-2.5 py-0.5 rounded text-xs font-bold border ${
@@ -864,21 +1285,63 @@ const DoctorDashboard = () => {
                             <td>
                               <span className={`px-2 py-0.5 rounded text-xs border font-bold ${
                                 appt.status === 'CONFIRMED' ? 'bg-green-50 text-green-700 border-green-200'
+                                : appt.status === 'COMPLETED' ? 'bg-purple-50 text-purple-700 border-purple-200'
                                 : appt.status === 'CANCELLED' ? 'bg-red-50 text-red-700 border-red-200'
                                 : 'bg-blue-50 text-blue-700 border-blue-200'
                               }`}>
                                 {appt.status}
                               </span>
                             </td>
+                            <td className="text-right">
+                              <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                                {appt.status === 'SCHEDULED' && (
+                                  <button
+                                    onClick={() => handleUpdateAppointmentStatus(appt.id, 'CONFIRMED')}
+                                    className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-[11px] font-semibold transition-colors shadow-sm"
+                                    title="Confirm this appointment"
+                                  >
+                                    Confirm
+                                  </button>
+                                )}
+                                {appt.status === 'CONFIRMED' && (
+                                  <button
+                                    onClick={() => handleUpdateAppointmentStatus(appt.id, 'COMPLETED')}
+                                    className="px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-[11px] font-semibold transition-colors shadow-sm"
+                                    title="Mark consultation as completed"
+                                  >
+                                    Complete
+                                  </button>
+                                )}
+                                {appt.status !== 'CANCELLED' && appt.status !== 'COMPLETED' && (
+                                  <button
+                                    onClick={() => handleDoctorCancelAppointment(appt.id)}
+                                    className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded text-[11px] font-semibold transition-colors"
+                                    title="Cancel appointment"
+                                  >
+                                    Cancel
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => setCurrentTab('messages')}
+                                  className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-[11px] font-semibold flex items-center gap-1 transition-colors"
+                                  title="Message patient"
+                                >
+                                  <MessageSquare className="w-3 h-3 text-blue-600" />
+                                  <span>Chat</span>
+                                </button>
+                              </div>
+                            </td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
+                  </div>
                 )}
               </div>
             </div>
-          )}
+          );
+        })()}
 
           {/* TAB 8: MESSAGES */}
           {currentTab === 'messages' && (

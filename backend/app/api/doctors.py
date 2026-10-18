@@ -2,6 +2,7 @@ import os
 from typing import List, Optional
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import case
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.config import settings
@@ -10,7 +11,7 @@ from app.api.auth import require_role
 from app.models.models import (
     User, Doctor, DoctorReview, AIReport, MRIScan, Patient, ScanStatus, Notification, AuditLog, Appointment
 )
-from app.schemas.schemas import DoctorReviewCreate, DoctorReviewOut, MRIScanOut, PatientOut, DoctorOut, AppointmentCreate, AppointmentOut, DoctorSelectRequest
+from app.schemas.schemas import DoctorReviewCreate, DoctorReviewOut, MRIScanOut, PatientOut, DoctorOut, AppointmentCreate, AppointmentOut, DoctorSelectRequest, AppointmentStatusUpdate
 from app.services.email_service import send_email_notification
 
 router = APIRouter(prefix="/doctors", tags=["Doctors & Reviews"])
@@ -133,7 +134,7 @@ def get_pending_scans_for_doctor(
         return []
 
     return db.query(MRIScan).filter(
-        MRIScan.preferred_doctor_id == doctor.id,
+        (MRIScan.preferred_doctor_id == doctor.id) | (MRIScan.preferred_doctor_id == doctor.user_id),
         MRIScan.status.in_(pending_statuses)
     ).order_by(MRIScan.upload_date.desc()).all()
 
@@ -193,23 +194,24 @@ def select_or_change_doctor(
         db.commit()
         return {"message": "Doctor deselected successfully.", "assigned_doctor": None}
 
-    # Verify target doctor exists and is approved
-    doctor = db.query(Doctor).filter(
-        Doctor.id == req.doctor_id,
-        Doctor.is_approved == True
-    ).first()
-    if not doctor:
+    # Verify target doctor exists (match Doctor.id first, then Doctor.user_id)
+    doc_match = db.query(Doctor).filter(Doctor.id == req.doctor_id).first()
+    if not doc_match:
+        doc_match = db.query(Doctor).filter(Doctor.user_id == req.doctor_id).first()
+
+    if not doc_match:
         raise HTTPException(
             status_code=404,
-            detail="The selected doctor was not found or is not approved by hospital administration."
+            detail="The selected doctor was not found in the hospital directory."
         )
 
-    # If already selected this doctor, no change needed
-    if prev_doctor_id == doctor.id:
-        return {
-            "message": f"Dr. {doctor.name} is already your selected doctor.",
-            "assigned_doctor": doctor
-        }
+    if not doc_match.is_approved:
+        raise HTTPException(
+            status_code=400,
+            detail="The selected doctor is not approved by hospital administration."
+        )
+
+    doctor = doc_match
 
     # Persist the new doctor selection
     patient.assigned_doctor_id = doctor.id
@@ -221,6 +223,42 @@ def select_or_change_doctor(
     ).all()
     for s in pending_scans:
         s.preferred_doctor_id = doctor.id
+
+    # Cancel any pending SCHEDULED appointments with ANY other doctor to avoid stale conflicting consultations
+    other_active_appts = db.query(Appointment).filter(
+        Appointment.patient_id == patient.id,
+        Appointment.doctor_id != doctor.id,
+        Appointment.status == "SCHEDULED"
+    ).all()
+    for old_a in other_active_appts:
+        old_a.status = "CANCELLED"
+
+    # Ensure patient has an active consultation appointment request in the selected doctor's queue
+    existing_active_appt = db.query(Appointment).filter(
+        Appointment.patient_id == patient.id,
+        ((Appointment.doctor_id == doctor.id) | (Appointment.doctor_id == doctor.user_id)),
+        Appointment.status.in_(["SCHEDULED", "CONFIRMED"])
+    ).first()
+
+    if not existing_active_appt:
+        appt_time = (datetime.utcnow() + timedelta(days=1)).replace(hour=10, minute=30, second=0, microsecond=0)
+        new_appt = Appointment(
+            patient_id=patient.id,
+            doctor_id=doctor.id,
+            appointment_date=appt_time,
+            status="SCHEDULED",
+            notes="Primary Doctor Clinical Consultation"
+        )
+        db.add(new_appt)
+        
+        if doctor.user_id:
+            formatted_date = appt_time.strftime("%b %d, %Y at %I:%M %p")
+            doc_appt_notif = Notification(
+                user_id=doctor.user_id,
+                title="New Patient Appointment Request",
+                message=f"Patient {patient.name} requested a consultation for {formatted_date}."
+            )
+            db.add(doc_appt_notif)
 
     # Notify patient
     pat_notif = Notification(
@@ -240,20 +278,20 @@ def select_or_change_doctor(
         db.add(doc_notif)
 
     # Notify previous doctor (if any) that the patient updated their doctor selection
-    if prev_doctor_id:
+    if prev_doctor_id and prev_doctor_id != doctor.id:
         prev_doc = db.query(Doctor).filter(Doctor.id == prev_doctor_id).first()
         if prev_doc and prev_doc.user_id:
             old_doc_notif = Notification(
                 user_id=prev_doc.user_id,
                 title="Patient Care Relationship Concluded",
-                message=f"Patient {patient.name} has chosen a new primary doctor. Access to new scans and requests has been revoked."
+                message=f"Patient {patient.name} has chosen a new primary doctor. Access to new scans and requests has been reassigned."
             )
             db.add(old_doc_notif)
 
     # Audit log
     audit = AuditLog(
         user_id=current_user.id,
-        action="PATIENT_CHANGE_DOCTOR" if prev_doctor_id else "PATIENT_SELECT_DOCTOR",
+        action="PATIENT_CHANGE_DOCTOR" if (prev_doctor_id and prev_doctor_id != doctor.id) else "PATIENT_SELECT_DOCTOR",
         details=f"Patient {patient.name} (ID: {patient.id}) selected Dr. {doctor.name} (ID: {doctor.id}). Previous: {prev_doctor_id}"
     )
     db.add(audit)
@@ -438,22 +476,52 @@ def get_doctor_appointments(
         if not doctor:
             return {
                 "active_patients_count": 0,
+                "pending_requests_count": 0,
                 "appointments": []
             }
 
         appts = db.query(Appointment).filter(
-            Appointment.doctor_id == doctor.id
+            (Appointment.doctor_id == doctor.id) | (Appointment.doctor_id == doctor.user_id)
         ).order_by(Appointment.appointment_date.asc()).all()
+
+        # Auto-heal: ensure every patient who selected this doctor as primary has an appointment record
+        assigned_patients = db.query(Patient).filter(
+            (Patient.assigned_doctor_id == doctor.id) | (Patient.assigned_doctor_id == doctor.user_id)
+        ).all()
+        existing_appt_patient_ids = set(a.patient_id for a in appts)
+        for p in assigned_patients:
+            if p.id not in existing_appt_patient_ids:
+                auto_appt = Appointment(
+                    patient_id=p.id,
+                    doctor_id=doctor.id,
+                    appointment_date=(datetime.utcnow() + timedelta(days=1)).replace(hour=10, minute=30, second=0, microsecond=0),
+                    status="SCHEDULED",
+                    notes="Primary Doctor Clinical Consultation"
+                )
+                db.add(auto_appt)
+                db.commit()
+                db.refresh(auto_appt)
+                appts.append(auto_appt)
 
     valid_appts = []
     for a in appts:
         patient = a.patient
         if not patient:
-            continue
+            patient = db.query(Patient).filter(Patient.id == a.patient_id).first()
+        if not patient:
+            patient = db.query(Patient).filter(Patient.user_id == a.patient_id).first()
 
-        latest_scan = db.query(MRIScan).filter(
-            MRIScan.patient_id == patient.id
-        ).order_by(MRIScan.upload_date.desc()).first()
+        patient_name = patient.name if patient else f"Patient #{a.patient_id}"
+        patient_age = patient.age if patient else None
+        patient_gender = patient.gender if patient else "N/A"
+        patient_phone = patient.phone if patient else "N/A"
+        patient_id = patient.id if patient else a.patient_id
+
+        latest_scan = None
+        if patient:
+            latest_scan = db.query(MRIScan).filter(
+                MRIScan.patient_id == patient.id
+            ).order_by(MRIScan.upload_date.desc()).first()
 
         diagnosis = "Not yet analyzed"
         if latest_scan and latest_scan.ai_report:
@@ -461,11 +529,11 @@ def get_doctor_appointments(
 
         valid_appts.append({
             "id": a.id,
-            "patient_id": patient.id,
-            "patient_name": patient.name,
-            "age": patient.age,
-            "gender": patient.gender,
-            "phone": patient.phone,
+            "patient_id": patient_id,
+            "patient_name": patient_name,
+            "age": patient_age,
+            "gender": patient_gender,
+            "phone": patient_phone,
             "appointment_date": a.appointment_date.isoformat(),
             "appointment_date_formatted": a.appointment_date.strftime("%b %d, %Y at %I:%M %p"),
             "status": a.status,
@@ -474,9 +542,11 @@ def get_doctor_appointments(
         })
 
     unique_patient_ids = set(a["patient_id"] for a in valid_appts)
+    pending_count = sum(1 for a in valid_appts if a["status"] == "SCHEDULED")
 
     return {
         "active_patients_count": len(unique_patient_ids),
+        "pending_requests_count": pending_count,
         "appointments": valid_appts
     }
 
@@ -492,28 +562,41 @@ def book_patient_appointment(
     """
     patient = current_user.patient_profile
     if not patient:
+        patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+    if not patient:
         patient = Patient(
             user_id=current_user.id,
             name=current_user.email.split("@")[0].replace(".", " ").title(),
-            age=None,
-            gender=None,
-            phone=None,
-            address=None
+            age=30,
+            gender="Not Specified",
+            phone="Not Specified",
+            address="India"
         )
         db.add(patient)
         db.commit()
         db.refresh(patient)
 
-    doctor = db.query(Doctor).filter(
-        ((Doctor.id == appt_in.doctor_id) | (Doctor.user_id == appt_in.doctor_id)),
-        Doctor.is_approved == True
-    ).first()
+    doctor = db.query(Doctor).filter(Doctor.id == appt_in.doctor_id).first()
+    if not doctor:
+        doctor = db.query(Doctor).filter(Doctor.user_id == appt_in.doctor_id).first()
 
     if not doctor:
-        raise HTTPException(status_code=404, detail="Selected doctor was not found or is not approved by administrator.")
+        raise HTTPException(status_code=404, detail="Selected doctor was not found in the hospital directory.")
+
+    if not doctor.is_approved:
+        raise HTTPException(status_code=400, detail="Selected doctor is not approved by hospital administration.")
 
     if appt_in.appointment_date < datetime.utcnow() - timedelta(hours=24):
         raise HTTPException(status_code=400, detail="Appointment date and time must be in the future.")
+
+    # Auto-cancel any previous SCHEDULED consultations with other doctors so patient doesn't have stale/conflicting bookings
+    other_scheduled = db.query(Appointment).filter(
+        Appointment.patient_id == patient.id,
+        Appointment.doctor_id != doctor.id,
+        Appointment.status == "SCHEDULED"
+    ).all()
+    for old_appt in other_scheduled:
+        old_appt.status = "CANCELLED"
 
     new_appt = Appointment(
         patient_id=patient.id,
@@ -523,6 +606,18 @@ def book_patient_appointment(
         notes=appt_in.notes or "Clinical Consultation"
     )
     db.add(new_appt)
+
+    # When booking with a doctor, set this doctor as the patient's primary attending doctor
+    prev_doctor_id = patient.assigned_doctor_id
+    patient.assigned_doctor_id = doctor.id
+
+    # Reassign pending unreviewed scans to the newly chosen doctor
+    pending_scans = db.query(MRIScan).filter(
+        MRIScan.patient_id == patient.id,
+        MRIScan.status.in_([ScanStatus.AI_COMPLETED.value, ScanStatus.UNDER_REVIEW.value])
+    ).all()
+    for s in pending_scans:
+        s.preferred_doctor_id = doctor.id
 
     formatted_date = appt_in.appointment_date.strftime("%b %d, %Y at %I:%M %p")
     
@@ -540,6 +635,16 @@ def book_patient_appointment(
             message=f"Patient {patient.name if patient else 'User'} booked an appointment for {formatted_date}."
         )
         db.add(doc_notif)
+
+    if prev_doctor_id and prev_doctor_id != doctor.id:
+        prev_doc = db.query(Doctor).filter(Doctor.id == prev_doctor_id).first()
+        if prev_doc and prev_doc.user_id:
+            old_doc_notif = Notification(
+                user_id=prev_doc.user_id,
+                title="Patient Care Relationship Concluded",
+                message=f"Patient {patient.name} has scheduled care with a new doctor. Access to new scans has been reassigned."
+            )
+            db.add(old_doc_notif)
 
     audit = AuditLog(
         user_id=current_user.id,
@@ -562,29 +667,44 @@ def get_my_appointments(
     Retrieves all booked appointments for the logged-in user (patient or attending doctor).
     """
     if current_user.role == "DOCTOR":
-        doctor = current_user.doctor_profile
+        doctor = current_user.doctor_profile or db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
         if not doctor:
-            # Fallback for doctor user without explicit profile
-            doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
-        doctor_id = doctor.id if doctor else 1
-        appts = db.query(Appointment).filter(
-            Appointment.doctor_id == doctor_id
-        ).order_by(Appointment.appointment_date.asc()).all()
-    else:
-        patient = current_user.patient_profile
-        if not patient and current_user.role == "PATIENT":
             return []
-        patient_id = patient.id if patient else 1
         appts = db.query(Appointment).filter(
-            Appointment.patient_id == patient_id
-        ).order_by(Appointment.appointment_date.asc()).all()
+            (Appointment.doctor_id == doctor.id) | (Appointment.doctor_id == doctor.user_id)
+        ).order_by(
+            case((Appointment.status == "SCHEDULED", 0), (Appointment.status == "CONFIRMED", 1), else_=2),
+            Appointment.appointment_date.desc()
+        ).all()
+    else:
+        patient = current_user.patient_profile or db.query(Patient).filter(Patient.user_id == current_user.id).first()
+        if not patient:
+            return []
+        appts = db.query(Appointment).filter(
+            (Appointment.patient_id == patient.id) | (Appointment.patient_id == patient.user_id)
+        ).order_by(
+            case((Appointment.status == "SCHEDULED", 0), (Appointment.status == "CONFIRMED", 1), else_=2),
+            Appointment.appointment_date.desc()
+        ).all()
 
     result = []
     for a in appts:
-        doc = a.doctor
+        doc = db.query(Doctor).filter(Doctor.id == a.doctor_id).first()
+        if not doc:
+            doc = db.query(Doctor).filter(Doctor.user_id == a.doctor_id).first()
+        if not doc and a.doctor:
+            doc = a.doctor
+
+        pat = db.query(Patient).filter(Patient.id == a.patient_id).first()
+        if not pat:
+            pat = db.query(Patient).filter(Patient.user_id == a.patient_id).first()
+        if not pat and a.patient:
+            pat = a.patient
+
         result.append({
             "id": a.id,
             "patient_id": a.patient_id,
+            "patient_name": pat.name if pat else f"Patient #{a.patient_id}",
             "doctor_id": a.doctor_id,
             "doctor_name": doc.name if doc else "Dr. Specialist",
             "specialization": doc.specialization if doc else "Neurology",
@@ -611,10 +731,102 @@ def cancel_appointment(
     if not appt:
         raise HTTPException(status_code=404, detail="Appointment not found.")
 
-    if current_user.role == "PATIENT" and current_user.patient_profile:
-        if appt.patient_id != current_user.patient_profile.id:
+    if current_user.role == "PATIENT":
+        patient = current_user.patient_profile or db.query(Patient).filter(Patient.user_id == current_user.id).first()
+        if not patient or (appt.patient_id != patient.id and appt.patient_id != patient.user_id):
             raise HTTPException(status_code=403, detail="Cannot cancel appointments belonging to another patient.")
+    elif current_user.role == "DOCTOR":
+        doctor = current_user.doctor_profile or db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
+        if not doctor or (appt.doctor_id != doctor.id and appt.doctor_id != doctor.user_id):
+            raise HTTPException(status_code=403, detail="Cannot cancel appointments belonging to another doctor.")
 
     appt.status = "CANCELLED"
+    formatted_date = appt.appointment_date.strftime("%b %d, %Y at %I:%M %p")
+
+    # Send notification to other party
+    if current_user.role == "PATIENT":
+        doc = appt.doctor
+        if doc and doc.user_id:
+            pat_name = appt.patient.name if appt.patient else "Patient"
+            notif = Notification(
+                user_id=doc.user_id,
+                title="Appointment Cancelled by Patient",
+                message=f"{pat_name} has cancelled their appointment scheduled for {formatted_date}."
+            )
+            db.add(notif)
+    else:
+        pat = appt.patient
+        if pat and pat.user_id:
+            doc_name = appt.doctor.name if appt.doctor else "Doctor"
+            notif = Notification(
+                user_id=pat.user_id,
+                title="Appointment Cancelled by Doctor",
+                message=f"Dr. {doc_name} has cancelled your appointment scheduled for {formatted_date}."
+            )
+            db.add(notif)
+
+    audit = AuditLog(
+        user_id=current_user.id,
+        action="APPOINTMENT_CANCEL",
+        details=f"Cancelled appointment #{appt.id} scheduled for {formatted_date}"
+    )
+    db.add(audit)
     db.commit()
     return {"message": "Appointment cancelled successfully."}
+
+@router.put("/appointments/{appointment_id}/status")
+def update_appointment_status(
+    appointment_id: int,
+    status_in: AppointmentStatusUpdate,
+    current_user: User = Depends(require_role(["DOCTOR", "ADMIN"])),
+    db: Session = Depends(get_db)
+):
+    """
+    Updates the status of an appointment (e.g. CONFIRMED, COMPLETED, CANCELLED).
+    """
+    appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Appointment not found.")
+
+    if current_user.role == "DOCTOR":
+        doctor = current_user.doctor_profile or db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
+        if not doctor or (appt.doctor_id != doctor.id and appt.doctor_id != doctor.user_id):
+            raise HTTPException(status_code=403, detail="Cannot update appointments belonging to another doctor.")
+
+    new_status = status_in.status.upper()
+    valid_statuses = ["SCHEDULED", "CONFIRMED", "COMPLETED", "CANCELLED"]
+    if new_status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}")
+
+    appt.status = new_status
+    formatted_date = appt.appointment_date.strftime("%b %d, %Y at %I:%M %p")
+
+    # Notify patient
+    pat = appt.patient
+    doc_name = appt.doctor.name if appt.doctor else "Doctor"
+    if pat and pat.user_id:
+        title = f"Appointment {new_status.title()}"
+        if new_status == "CONFIRMED":
+            msg = f"Dr. {doc_name} has confirmed your appointment for {formatted_date}."
+        elif new_status == "COMPLETED":
+            msg = f"Your clinical consultation with Dr. {doc_name} on {formatted_date} has been marked as completed."
+        elif new_status == "CANCELLED":
+            msg = f"Dr. {doc_name} has cancelled your appointment scheduled for {formatted_date}."
+        else:
+            msg = f"Your appointment status with Dr. {doc_name} has been updated to {new_status}."
+
+        notif = Notification(
+            user_id=pat.user_id,
+            title=title,
+            message=msg
+        )
+        db.add(notif)
+
+    audit = AuditLog(
+        user_id=current_user.id,
+        action=f"APPOINTMENT_{new_status}",
+        details=f"Appointment #{appt.id} status changed to {new_status}"
+    )
+    db.add(audit)
+    db.commit()
+    return {"message": f"Appointment status updated to {new_status} successfully.", "status": new_status}

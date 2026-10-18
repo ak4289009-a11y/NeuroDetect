@@ -31,6 +31,7 @@ const PatientDashboard = () => {
   const [educationalVideosList, setEducationalVideosList] = useState([]);
   const [faqDirectoryList, setFaqDirectoryList] = useState([]);
   const [publicDoctorsList, setPublicDoctorsList] = useState([]);
+  const [allDoctorsList, setAllDoctorsList] = useState([]);
   const [availableLocationsList, setAvailableLocationsList] = useState([]);
   const [selectedCityFilter, setSelectedCityFilter] = useState('All');
   const [selectedActiveVideo, setSelectedActiveVideo] = useState(null);
@@ -65,12 +66,16 @@ const PatientDashboard = () => {
   }, []);
 
   useEffect(() => {
-    if (selectedCityFilter !== 'All') {
+    if (selectedCityFilter === 'All') {
+      if (allDoctorsList.length > 0) {
+        setPublicDoctorsList(allDoctorsList);
+      }
+    } else {
       doctorAPI.getPublicDoctors(selectedCityFilter)
         .then(res => setPublicDoctorsList(res.data || []))
         .catch(err => console.error("Error fetching doctors by city:", err));
     }
-  }, [selectedCityFilter]);
+  }, [selectedCityFilter, allDoctorsList]);
 
   const loadDashboardData = async () => {
     setLoadingStatus(true);
@@ -94,6 +99,7 @@ const PatientDashboard = () => {
       setDietPlansList(dietRes.data || []);
       setEducationalVideosList(videoRes.data || []);
       setFaqDirectoryList(faqRes.data || []);
+      setAllDoctorsList(docRes.data || []);
       setPublicDoctorsList(docRes.data || []);
       setAvailableLocationsList(locRes.data?.locations || []);
       setSelectedDoctor(selDocRes.data || null);
@@ -110,10 +116,12 @@ const PatientDashboard = () => {
       await doctorAPI.selectDoctor(docItem.id);
       setSelectedDoctor(docItem);
       setToastNotification({
-        message: `Successfully selected Dr. ${docItem.name} as your primary doctor.`,
+        message: `Successfully selected Dr. ${docItem.name.replace(/^Dr\.\s*/i, '')}! Consultation scheduled.`,
         type: "success"
       });
+      await loadMyAppointments();
       await loadDashboardData();
+      setCurrentTab('appointments');
     } catch (err) {
       setToastNotification({
         message: err.response?.data?.detail || "Failed to select doctor.",
@@ -150,17 +158,20 @@ const PatientDashboard = () => {
     try {
       const dateTimeStr = `${bookingForm.date}T${bookingForm.time}:00`;
       await appointmentAPI.bookAppointment({
-        doctor_id: bookingModalDoc.id,
+        doctor_id: Number(bookingModalDoc.id),
         appointment_date: dateTimeStr,
         notes: bookingForm.notes || 'Clinical Consultation'
       });
 
+      setSelectedDoctor(bookingModalDoc);
+
       setToastNotification({
-        message: `Appointment successfully booked with ${bookingModalDoc.name}!`,
+        message: `Appointment successfully booked with Dr. ${bookingModalDoc.name.replace(/^Dr\.\s*/i, '')}!`,
         type: 'success'
       });
       setBookingModalDoc(null);
       await loadMyAppointments();
+      await loadDashboardData();
       setCurrentTab('appointments');
     } catch (err) {
       const detail = err.response?.data?.detail || "Failed to book appointment. Please try again.";
@@ -254,7 +265,20 @@ const PatientDashboard = () => {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+                    <button
+                      onClick={() => {
+                        setBookingModalDoc(selectedDoctor);
+                        setBookingForm({
+                          date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+                          time: '10:30',
+                          notes: 'Clinical Consultation & MRI Evaluation'
+                        });
+                      }}
+                      className="px-3.5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
+                    >
+                      <Calendar className="w-3.5 h-3.5" /> Book Appointment
+                    </button>
                     <button
                       onClick={() => setCurrentTab('messages')}
                       className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
@@ -262,7 +286,7 @@ const PatientDashboard = () => {
                       <MessageSquare className="w-3.5 h-3.5" /> Message Doctor
                     </button>
                     <button
-                      onClick={() => setCurrentTab('doctors')}
+                      onClick={() => setCurrentTab('recommendation')}
                       className="px-3.5 py-2 bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
                     >
                       Change Doctor
@@ -283,7 +307,7 @@ const PatientDashboard = () => {
                     </div>
                   </div>
                   <button
-                    onClick={() => setCurrentTab('doctors')}
+                    onClick={() => setCurrentTab('recommendation')}
                     className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm whitespace-nowrap"
                   >
                     Select a Doctor
@@ -682,25 +706,68 @@ const PatientDashboard = () => {
                   <h1 className="text-xl font-bold text-gray-900">Scheduled Clinical Appointments</h1>
                   <p className="text-xs text-gray-500">Track and manage your upcoming consultations with neurologists</p>
                 </div>
-                <button
-                  onClick={() => setCurrentTab('recommendation')}
-                  className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm shrink-0"
-                >
-                  <Calendar className="w-4 h-4" /> Book New Appointment
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const docToBook = selectedDoctor || (publicDoctorsList.length > 0 ? publicDoctorsList[0] : null);
+                      if (docToBook) {
+                        setBookingModalDoc(docToBook);
+                        setBookingForm({
+                          date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+                          time: '10:30',
+                          notes: 'Clinical Consultation & MRI Evaluation'
+                        });
+                      } else {
+                        setCurrentTab('recommendation');
+                      }
+                    }}
+                    className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm shrink-0"
+                  >
+                    <Calendar className="w-4 h-4" /> Book Appointment
+                  </button>
+                  <button
+                    onClick={() => setCurrentTab('recommendation')}
+                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm shrink-0"
+                  >
+                    <Stethoscope className="w-4 h-4" /> Browse Doctor Directory
+                  </button>
+                </div>
               </div>
 
               <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm space-y-4">
                 {myAppointments.length === 0 ? (
-                  <div className="p-8 text-center space-y-2">
-                    <Calendar className="w-8 h-8 text-gray-400 mx-auto" />
-                    <p className="text-xs text-gray-500 font-medium">No appointments scheduled yet.</p>
-                    <button
-                      onClick={() => setCurrentTab('recommendation')}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold text-xs"
-                    >
-                      Browse Doctors Directory & Book
-                    </button>
+                  <div className="p-8 text-center space-y-3">
+                    <Calendar className="w-10 h-10 text-gray-400 mx-auto" />
+                    <div>
+                      <p className="text-sm font-bold text-gray-800">No appointments scheduled yet</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Book a clinical consultation with your neurologist to review your scans and treatment plan.</p>
+                    </div>
+                    <div className="flex flex-wrap justify-center gap-2 pt-2">
+                      <button
+                        onClick={() => {
+                          const docToBook = selectedDoctor || (publicDoctorsList.length > 0 ? publicDoctorsList[0] : null);
+                          if (docToBook) {
+                            setBookingModalDoc(docToBook);
+                            setBookingForm({
+                              date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+                              time: '10:30',
+                              notes: 'Clinical Consultation & MRI Evaluation'
+                            });
+                          } else {
+                            setCurrentTab('recommendation');
+                          }
+                        }}
+                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold text-xs flex items-center gap-1.5 shadow-sm"
+                      >
+                        <Calendar className="w-4 h-4" /> Book Appointment
+                      </button>
+                      <button
+                        onClick={() => setCurrentTab('recommendation')}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-xs flex items-center gap-1.5 shadow-sm"
+                      >
+                        <Stethoscope className="w-4 h-4" /> Browse Doctor Directory
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -717,9 +784,9 @@ const PatientDashboard = () => {
                         <div className="space-y-1 text-gray-700">
                           <p className="flex items-center gap-1.5 font-bold text-gray-900">
                             <Clock className="w-3.5 h-3.5 text-blue-600" />
-                            <span>{appt.appointment_date_formatted}</span>
+                            <span>{appt.appointment_date_formatted || appt.appointment_date}</span>
                           </p>
-                          <p><b>Hospital:</b> {appt.hospital} ({appt.city})</p>
+                          <p><b>Hospital:</b> {appt.hospital} ({appt.city || 'India'})</p>
                           <p><b>Reason / Notes:</b> {appt.notes || 'Clinical consultation'}</p>
                         </div>
 
@@ -731,7 +798,7 @@ const PatientDashboard = () => {
                             <MessageSquare className="w-3.5 h-3.5" /> Message Doctor
                           </button>
 
-                          {appt.status === 'SCHEDULED' && (
+                          {(appt.status === 'SCHEDULED' || appt.status === 'CONFIRMED') && (
                             <button
                               onClick={() => handleCancelAppointment(appt.id)}
                               className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded font-semibold text-xs transition-colors"
@@ -788,9 +855,34 @@ const PatientDashboard = () => {
               </button>
             </div>
 
+            {/* Doctor Selector Dropdown */}
+            {(allDoctorsList.length > 0 || publicDoctorsList.length > 0) && (
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">Select Consulting Doctor</label>
+                <select
+                  value={bookingModalDoc.id}
+                  onChange={(e) => {
+                    const chosenId = Number(e.target.value);
+                    const doctorsSource = allDoctorsList.length > 0 ? allDoctorsList : publicDoctorsList;
+                    const chosenDoc = doctorsSource.find(d => d.id === chosenId);
+                    if (chosenDoc) {
+                      setBookingModalDoc(chosenDoc);
+                    }
+                  }}
+                  className="w-full p-2 bg-white border border-gray-300 rounded-lg font-semibold text-xs focus:ring-2 focus:ring-green-600 focus:outline-none"
+                >
+                  {(allDoctorsList.length > 0 ? allDoctorsList : publicDoctorsList).map((doc) => (
+                    <option key={doc.id} value={doc.id}>
+                      {doc.name.startsWith("Dr.") ? doc.name : `Dr. ${doc.name}`} — {doc.specialization} ({doc.hospital}, {doc.city || doc.location})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg space-y-1 text-blue-900">
               <p><b>Hospital:</b> {bookingModalDoc.hospital}</p>
-              <p><b>Location:</b> {bookingModalDoc.location}</p>
+              <p><b>Location:</b> {bookingModalDoc.location || `${bookingModalDoc.city}, India`}</p>
               <p><b>Experience:</b> {bookingModalDoc.experience_years} Years</p>
             </div>
 

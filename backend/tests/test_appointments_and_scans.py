@@ -67,6 +67,72 @@ def test_patient_cancel_appointment():
         assert response.status_code == 200
         assert "cancelled" in response.json()["message"].lower()
 
+def test_doctor_can_confirm_and_complete_appointment():
+    """Test doctor updating appointment status to CONFIRMED and COMPLETED."""
+    patient_token = get_token_for_user("amitav.roy@example.com")
+    p_headers = {"Authorization": f"Bearer {patient_token}"}
+
+    db = SessionLocal()
+    doctor = db.query(Doctor).filter(Doctor.is_approved == True).first()
+    doc_user = db.query(User).filter(User.id == doctor.user_id).first()
+    db.close()
+
+    doctor_token = create_access_token(data={"user_id": doc_user.id, "role": "DOCTOR"})
+    d_headers = {"Authorization": f"Bearer {doctor_token}"}
+
+    appt_time = (datetime.utcnow() + timedelta(days=5)).replace(minute=0, second=0, microsecond=0)
+    payload = {
+        "doctor_id": doctor.id,
+        "appointment_date": appt_time.isoformat(),
+        "notes": "Follow-up MRI review"
+    }
+    book_res = client.post("/api/v1/doctors/appointments/book", json=payload, headers=p_headers)
+    assert book_res.status_code == 200
+    appt_id = book_res.json()["id"]
+
+    # Doctor confirms appointment
+    confirm_res = client.put(f"/api/v1/doctors/appointments/{appt_id}/status", json={"status": "CONFIRMED"}, headers=d_headers)
+    assert confirm_res.status_code == 200
+    assert confirm_res.json()["status"] == "CONFIRMED"
+
+    # Doctor completes appointment
+    complete_res = client.put(f"/api/v1/doctors/appointments/{appt_id}/status", json={"status": "COMPLETED"}, headers=d_headers)
+    assert complete_res.status_code == 200
+    assert complete_res.json()["status"] == "COMPLETED"
+
+def test_appointment_booking_auto_heals_unregistered_patient_profile():
+    """Test booking appointment auto-heals profile for patient account lacking pre-existing Patient row."""
+    import uuid
+    db = SessionLocal()
+    random_email = f"autoheal_{uuid.uuid4().hex[:8]}@example.com"
+    user = User(
+        email=random_email,
+        hashed_password="hashed_pw_test",
+        role="PATIENT",
+        is_active=True
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    user_id = user.id
+    token = create_access_token(data={"user_id": user_id, "role": "PATIENT"})
+    doctor = db.query(Doctor).filter(Doctor.is_approved == True).first()
+    db.close()
+
+    headers = {"Authorization": f"Bearer {token}"}
+    appt_time = (datetime.utcnow() + timedelta(days=3)).replace(minute=0, second=0, microsecond=0)
+    res = client.post("/api/v1/doctors/appointments/book", json={
+        "doctor_id": doctor.id,
+        "appointment_date": appt_time.isoformat(),
+        "notes": "First-time patient consultation"
+    }, headers=headers)
+
+    assert res.status_code == 200, f"Auto-heal booking failed: {res.text}"
+    data = res.json()
+    assert data["status"] == "SCHEDULED"
+    assert data["patient"] is not None
+    assert data["doctor"] is not None
+
 import tempfile
 
 def test_mri_upload_valid_image():

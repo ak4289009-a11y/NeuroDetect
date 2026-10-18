@@ -82,9 +82,9 @@ class PatientOut(BaseModel):
     user_id: int
     assigned_doctor_id: Optional[int] = None
     name: str
-    age: int
-    gender: str
-    phone: str
+    age: Optional[int] = None
+    gender: Optional[str] = None
+    phone: Optional[str] = None
     address: Optional[str] = None
     medical_history: Optional[str] = None
     assigned_doctor: Optional[DoctorOut] = None
@@ -298,6 +298,9 @@ class AppointmentCreate(BaseModel):
     doctor_id: int
     appointment_date: datetime
     notes: Optional[str] = "Clinical Consultation"
+
+class AppointmentStatusUpdate(BaseModel):
+    status: str
 
 class AppointmentOut(BaseModel):
     id: int

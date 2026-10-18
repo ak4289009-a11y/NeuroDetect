@@ -45,9 +45,9 @@ class Patient(Base):
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
     assigned_doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=True)
     name = Column(String(255), nullable=False)
-    age = Column(Integer, nullable=False)
-    gender = Column(String(50), nullable=False)
-    phone = Column(String(50), nullable=False)
+    age = Column(Integer, nullable=True, default=30)
+    gender = Column(String(50), nullable=True, default="Not Specified")
+    phone = Column(String(50), nullable=True, default="Not Provided")
     address = Column(Text, nullable=True)
     medical_history = Column(Text, nullable=True)
 

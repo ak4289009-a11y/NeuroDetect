@@ -257,13 +257,14 @@ def seed_database():
         all_db_patients = db.query(Patient).all()
         now = datetime.utcnow()
         for pat_idx, pat in enumerate(all_db_patients):
-            # Resolve selected doctor for this patient
+            # Resolve selected doctor for this patient only if not already assigned
             p_email = pat.user.email.strip().lower() if pat.user else ""
-            selected_doc = patient_doctor_rules.get(p_email, created_doctors[pat_idx % len(created_doctors)])
-            
-            # Persist assigned primary neurologist on the Patient record
-            pat.assigned_doctor_id = selected_doc.id
-            db.commit()
+            if not pat.assigned_doctor_id:
+                selected_doc = patient_doctor_rules.get(p_email, created_doctors[pat_idx % len(created_doctors)])
+                pat.assigned_doctor_id = selected_doc.id
+                db.commit()
+            else:
+                selected_doc = db.query(Doctor).filter(Doctor.id == pat.assigned_doctor_id).first() or created_doctors[0]
 
             # Ensure all existing scans for this patient are linked to the selected doctor
             existing_patient_scans = db.query(MRIScan).filter(MRIScan.patient_id == pat.id).all()
@@ -325,11 +326,48 @@ def seed_database():
                         db.add(doc_rev)
                         db.commit()
 
-        # Update appointments to match each patient's selected doctor
-        all_appts = db.query(Appointment).all()
-        for appt in all_appts:
-            if appt.patient and appt.patient.assigned_doctor_id:
-                appt.doctor_id = appt.patient.assigned_doctor_id
+        # 4.1 ENSURE PRIMARY APPOINTMENTS FOR DOCTORS (Populates Dr. Anu's and attending doctors' rosters)
+        if dr_anu:
+            for em in ["patient@neurodetect.ai", "ak4289009@gmail.com"]:
+                p_user = db.query(User).filter(func.lower(User.email) == em).first()
+                if p_user and p_user.patient_profile:
+                    p_user.patient_profile.assigned_doctor_id = dr_anu.id
+            db.commit()
+
+        # Ensure all assigned patients have at least one active appointment with their assigned doctor
+        for pat in all_db_patients:
+            if not pat.assigned_doctor_id:
+                continue
+            doc = db.query(Doctor).filter(Doctor.id == pat.assigned_doctor_id).first()
+            if not doc:
+                continue
+            existing_appt = db.query(Appointment).filter(
+                Appointment.patient_id == pat.id,
+                Appointment.doctor_id == doc.id,
+                Appointment.status.in_(["SCHEDULED", "CONFIRMED"])
+            ).first()
+            if not existing_appt:
+                appt_day_offset = (pat.id % 4) + 1
+                appt_time = (now + timedelta(days=appt_day_offset)).replace(hour=10 + (pat.id % 3), minute=30, second=0, microsecond=0)
+                p_em = pat.user.email.strip().lower() if pat.user else ""
+                if p_em == "patient@neurodetect.ai":
+                    status = "SCHEDULED"
+                    notes = "Primary Doctor Clinical Consultation & MRI Scan Evaluation"
+                elif p_em == "ak4289009@gmail.com":
+                    status = "CONFIRMED"
+                    notes = "Follow-up Neurological Review & Brain MRI Checkup"
+                else:
+                    status = "SCHEDULED" if pat.id % 2 == 0 else "CONFIRMED"
+                    notes = "Routine Clinical Consultation & Diagnostic Review"
+
+                new_seed_appt = Appointment(
+                    patient_id=pat.id,
+                    doctor_id=doc.id,
+                    appointment_date=appt_time,
+                    status=status,
+                    notes=notes
+                )
+                db.add(new_seed_appt)
         db.commit()
 
         # 5. DIET PLANS

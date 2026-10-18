@@ -120,27 +120,45 @@ from fastapi.responses import HTMLResponse
 @app.get("/quick-login/{role}", include_in_schema=False)
 @app.get("/dev-login/{role}", include_in_schema=False)
 def dev_login(role: str):
-    role_upper = role.upper()
-    role_email = {
-        "PATIENT": "patient@neurodetect.ai",
-        "DOCTOR": "dr.rajesh@neurodetect.ai",
-        "ADMIN": "admin@neurodetect.ai"
-    }.get(role_upper, "patient@neurodetect.ai")
+    role_upper = role.upper().replace("-", "_")
     
-    role_pwd = {
-        "PATIENT": "Patient@123456",
-        "DOCTOR": "Doctor@123456",
-        "ADMIN": "Admin@123456"
-    }.get(role_upper, "Patient@123456")
-
-    target_path = f"/{role.lower()}"
+    if "SUNITA" in role_upper or "THORNE" in role_upper:
+        role_email = "dr.thorne@neurodetect.ai"
+        role_pwd = "Doctor@123456"
+        role_auth = "DOCTOR"
+        target_path = "/doctor"
+        display_name = "Dr. Sunita Patel"
+    elif "ANU" in role_upper:
+        role_email = "anu@neurodetect.ai"
+        role_pwd = "Doctor@123456"
+        role_auth = "DOCTOR"
+        target_path = "/doctor"
+        display_name = "Dr. Anuradha Kumari"
+    elif "DOCTOR" in role_upper or "RAJESH" in role_upper:
+        role_email = "dr.rajesh@neurodetect.ai"
+        role_pwd = "Doctor@123456"
+        role_auth = "DOCTOR"
+        target_path = "/doctor"
+        display_name = "Dr. Rajesh Kumar"
+    elif "ADMIN" in role_upper:
+        role_email = "admin@neurodetect.ai"
+        role_pwd = "Admin@123456"
+        role_auth = "ADMIN"
+        target_path = "/admin"
+        display_name = "System Administrator"
+    else:
+        role_email = "patient@neurodetect.ai"
+        role_pwd = "Patient@123456"
+        role_auth = "PATIENT"
+        target_path = "/patient"
+        display_name = "Patient User"
 
     html = f"""<!DOCTYPE html>
 <html>
-<head><title>NeuroDetect - Signing into {role_upper}...</title></head>
+<head><title>NeuroDetect - Signing into {display_name}...</title></head>
 <body>
 <div style="font-family:system-ui,-apple-system,sans-serif;padding:60px 20px;text-align:center;">
-  <h2 style="color:#1e3a8a;margin-bottom:8px;">Signing in as {role.capitalize()}...</h2>
+  <h2 style="color:#1e3a8a;margin-bottom:8px;">Signing in as {display_name}...</h2>
   <p style="color:#64748b;font-size:14px;">Preparing session, please wait a moment...</p>
 </div>
 <script>
@@ -150,7 +168,7 @@ fetch('/api/v1/auth/login', {{
   body: JSON.stringify({{
     email: '{role_email}',
     password: '{role_pwd}',
-    role: '{role_upper}'
+    role: '{role_auth}'
   }})
 }})
 .then(r => r.json())

@@ -6,13 +6,20 @@ import {
   ListChecks, Calendar, MessageSquare, ChevronDown, Settings
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { messageAPI } from '../../services/api';
+import { messageAPI, doctorAPI } from '../../services/api';
 
-const Sidebar = ({ currentTab, setCurrentTab }) => {
+const Sidebar = ({ currentTab, setCurrentTab, pendingApptsCount: propApptsCount }) => {
   const { role, user, logout } = useAuth();
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingApptsCount, setPendingApptsCount] = useState(propApptsCount || 0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (propApptsCount !== undefined) {
+      setPendingApptsCount(propApptsCount);
+    }
+  }, [propApptsCount]);
 
   useEffect(() => {
     if (role === 'DOCTOR' || role === 'PATIENT') {
@@ -26,6 +33,23 @@ const Sidebar = ({ currentTab, setCurrentTab }) => {
       };
       fetchUnread();
       const interval = setInterval(fetchUnread, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [role]);
+
+  useEffect(() => {
+    if (role === 'DOCTOR') {
+      const fetchDoctorAppts = async () => {
+        try {
+          const res = await doctorAPI.getAppointments();
+          const count = res.data?.pending_requests_count ?? (res.data?.appointments || []).filter(a => a.status === 'SCHEDULED').length;
+          setPendingApptsCount(count);
+        } catch (e) {
+          // ignore silent polling errors
+        }
+      };
+      fetchDoctorAppts();
+      const interval = setInterval(fetchDoctorAppts, 10000);
       return () => clearInterval(interval);
     }
   }, [role]);
@@ -45,10 +69,10 @@ const Sidebar = ({ currentTab, setCurrentTab }) => {
 
   const doctorNav = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'pending-scans', label: 'Pending Reports', icon: UploadCloud },
-    { id: 'patient-history', label: 'Patient History', icon: ListChecks },
+    { id: 'pending-scans', label: 'Clinical Queue', icon: ListChecks, badge: pendingApptsCount },
+    { id: 'patient-history', label: 'Patient History', icon: Users },
     { id: 'reports', label: 'Reports', icon: FileText },
-    { id: 'patients', label: 'Appointments', icon: Calendar },
+    { id: 'patients', label: 'Appointments', icon: Calendar, badge: pendingApptsCount },
     { id: 'messages', label: 'Messages', icon: MessageSquare, badge: unreadCount },
     { id: 'contact-admin', label: 'Contact Admin', icon: Mail },
     { id: 'profile', label: 'Profile', icon: User },

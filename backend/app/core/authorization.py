@@ -109,19 +109,21 @@ def get_doctor_authorized_patient_ids(doctor: Doctor, db: Session) -> Set[int]:
     authorized_ids: Set[int] = set()
 
     # 1. Patients who have this doctor as their explicitly assigned primary doctor
-    primary_pat_tuples = db.query(Patient.id).filter(Patient.assigned_doctor_id == doctor.id).all()
+    primary_pat_tuples = db.query(Patient.id).filter(
+        (Patient.assigned_doctor_id == doctor.id) | (Patient.assigned_doctor_id == doctor.user_id)
+    ).all()
     authorized_ids.update(p[0] for p in primary_pat_tuples if p[0])
 
     # 2. Patients who have active scheduled appointments with this doctor
     appt_pat_tuples = db.query(Appointment.patient_id).filter(
-        Appointment.doctor_id == doctor.id,
+        (Appointment.doctor_id == doctor.id) | (Appointment.doctor_id == doctor.user_id),
         Appointment.status.in_(["SCHEDULED", "CONFIRMED"])
     ).all()
     authorized_ids.update(p[0] for p in appt_pat_tuples if p[0])
 
     # 3. Patients who have active pending scans assigned to this doctor
     scan_pat_tuples = db.query(MRIScan.patient_id).filter(
-        MRIScan.preferred_doctor_id == doctor.id,
+        (MRIScan.preferred_doctor_id == doctor.id) | (MRIScan.preferred_doctor_id == doctor.user_id),
         MRIScan.status.in_(["AI_COMPLETED", "UNDER_REVIEW"])
     ).all()
     authorized_ids.update(p[0] for p in scan_pat_tuples if p[0])

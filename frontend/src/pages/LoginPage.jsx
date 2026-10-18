@@ -150,7 +150,7 @@ const LoginPage = () => {
             <span>⚡ Demo Accounts</span>
             <span className="text-[10px] text-blue-600 font-normal">Click to auto-fill</span>
           </div>
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
             <button
               type="button"
               onClick={() => {
@@ -166,12 +166,34 @@ const LoginPage = () => {
               type="button"
               onClick={() => {
                 setRole('DOCTOR');
+                setEmail('dr.thorne@neurodetect.ai');
+                setPassword('Doctor@123456');
+              }}
+              className="py-1 px-2 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded text-[11px] font-medium text-slate-700 hover:text-blue-700 transition-all text-center shadow-xs"
+            >
+              🩺 Dr. Sunita
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setRole('DOCTOR');
                 setEmail('dr.rajesh@neurodetect.ai');
                 setPassword('Doctor@123456');
               }}
               className="py-1 px-2 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded text-[11px] font-medium text-slate-700 hover:text-blue-700 transition-all text-center shadow-xs"
             >
-              🩺 Doctor
+              🩺 Dr. Rajesh
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setRole('DOCTOR');
+                setEmail('anu@neurodetect.ai');
+                setPassword('Doctor@123456');
+              }}
+              className="py-1 px-2 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded text-[11px] font-medium text-slate-700 hover:text-blue-700 transition-all text-center shadow-xs"
+            >
+              🩺 Dr. Anuradha
             </button>
             <button
               type="button"

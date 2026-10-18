@@ -66,6 +66,7 @@ export const doctorAPI = {
   bookAppointment: (data) => api.post('/doctors/appointments/book', data),
   getMyAppointments: () => api.get('/doctors/appointments/my-appointments'),
   cancelAppointment: (id) => api.put(`/doctors/appointments/${id}/cancel`),
+  updateAppointmentStatus: (id, status) => api.put(`/doctors/appointments/${id}/status`, { status }),
   selectDoctor: (doctorId) => api.post('/doctors/select', { doctor_id: doctorId }),
   getSelectedDoctor: () => api.get('/doctors/selected'),
 };
@@ -75,6 +76,7 @@ export const appointmentAPI = {
   bookAppointment: (data) => api.post('/doctors/appointments/book', data),
   getMyAppointments: () => api.get('/doctors/appointments/my-appointments'),
   cancelAppointment: (id) => api.put(`/doctors/appointments/${id}/cancel`),
+  updateAppointmentStatus: (id, status) => api.put(`/doctors/appointments/${id}/status`, { status }),
 };
 
 // Report Services - Authenticated Blob PDF Download
