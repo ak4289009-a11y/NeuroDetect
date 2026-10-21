@@ -3,23 +3,61 @@ NEURODETECT: BRAIN TUMOR CLINICAL CAD SYSTEM
 AI-Powered Deep Learning Neuro-Radiology Platform
 ================================================================================
 
-HOW TO RUN THE APPLICATION:
---------------------------
-Option A: Standard Interactive Window
+HOW TO RUN THE APPLICATION ON ANY COMPUTER:
+-------------------------------------------
+
+PREREQUISITES:
+  - Python 3.10+ (Check "Add Python to PATH" during installation)
+  - Node.js is NOT required for running (React frontend is pre-compiled)
+
+
+OPTION 1: ONE-CLICK LAUNCHER (RECOMMENDED FOR WINDOWS)
+------------------------------------------------------
   Double-click "START_NEURODETECT.bat" in this directory.
+  - Automatically creates Python virtual environment if missing.
+  - Automatically installs dependencies from requirements.txt on first run.
+  - Automatically seeds the database with test accounts and sample cases.
+  - Starts the backend server and opens http://127.0.0.1:8000 in your browser.
 
-Option B: ALWAYS ACTIVE (Background Service + Auto-Restart Watchdog)
-  1. Start in Background: Double-click "START_ALWAYS_ACTIVE.bat"
-     (Runs silently in the background with zero terminal windows; auto-restarts if crashed)
-  2. Check Service Health: Double-click "CHECK_STATUS.bat"
-  3. Stop Service: Double-click "STOP_ALWAYS_ACTIVE.bat"
-  4. Auto-Start on Windows Boot: Double-click "INSTALL_WINDOWS_AUTOSTART.bat"
 
-Application will be available at:
+OPTION 2: COMMAND LINE (WINDOWS / MACOS / LINUX)
+------------------------------------------------
+1. Open terminal and navigate to backend:
+   cd BrainTumer/backend
+
+2. Create & activate virtual environment:
+   # Windows PowerShell:
+   python -m venv venv
+   .\venv\Scripts\Activate.ps1
+   (Note: If execution policy blocks it, run: Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass)
+
+   # Windows Command Prompt (CMD):
+   python -m venv venv
+   venv\Scripts\activate.bat
+
+   # macOS / Linux:
+   python3 -m venv venv
+   source venv/bin/activate
+
+3. Install dependencies:
+   pip install -r requirements.txt
+
+4. Initialize database:
+   python seed_data.py
+
+5. Run server:
+   python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+
+6. Open browser:
    http://127.0.0.1:8000
 
-(Note: Node.js is NOT required. The React frontend is already compiled into
-production distribution and served directly by the Python application server.)
+
+OPTION 3: VS CODE ONE-CLICK RUN
+-------------------------------
+1. Open the "BrainTumer" folder in VS Code.
+2. Select Python Interpreter: Ctrl+Shift+P -> "Python: Select Interpreter" -> .\backend\venv\Scripts\python.exe
+3. Press Ctrl + Shift + B -> Select "Run Backend Server (Port 8000)".
+4. Or press F5 to launch with debugger.
 
 
 LOGIN CREDENTIALS FOR TESTING:
@@ -27,17 +65,17 @@ LOGIN CREDENTIALS FOR TESTING:
 1. Patient Account:
    - Email:    patient@neurodetect.ai
    - Password:  Patient@123456
-   - Access:   Upload MRI scans, view diagnosis, download PDF reports
+   - Access:   Select doctor, upload MRI scans, view diagnosis, download PDF reports
 
 2. Doctor Account:
    - Email:    dr.rajesh@neurodetect.ai  (or dr.smith@neurodetect.ai)
    - Password:  Doctor@123456
-   - Access:   Review patient scans, confirm diagnosis, clinical sign-off
+   - Access:   Review scans for assigned patients only, Grad-CAM view, clinical notes
 
 3. Administrator Account:
    - Email:    admin@neurodetect.ai
    - Password:  Admin@123456
-   - Access:   Approve doctor registrations, view users and audit logs
+   - Access:   Approve doctor registrations, view users and security audit logs
 
 
 1-CLICK VIVA DEMO SHORTCUTS:
@@ -56,8 +94,16 @@ Sample test MRI scans are provided in the "sample_test_scans" directory:
 - sample_test_scans\4_No_Tumor\mri_sample_notumor.png
 
 
+RUNNING AUTOMATED TESTS:
+------------------------
+To verify the system with 30 passing automated tests:
+   cd backend
+   python -m pytest tests
+
+
 DOCUMENTATION FILES:
 --------------------
+- README.md                                (Complete guide & architecture documentation)
 - IGNOU_MCA_PROJECT_REPORT_SUBMISSION.pdf  (Official 104-page Project Report)
 - IGNOU_MCA_PROJECT_REPORT_SUBMISSION.docx (Official 104-page Project Report in Word)
 - docs\API_DOCUMENTATION.md                (API documentation)
