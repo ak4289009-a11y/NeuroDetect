@@ -43,6 +43,23 @@ def create_sample_mri_images():
 
 def seed_database():
     Base.metadata.create_all(bind=engine)
+    # Ensure backward-compatible dynamic column migrations for existing SQLite databases
+    from sqlalchemy import text
+    try:
+        with engine.connect() as conn:
+            for sql in [
+                "ALTER TABLE patients ADD COLUMN assigned_doctor_id INTEGER;",
+                "ALTER TABLE patients ADD COLUMN medical_history TEXT;",
+                "ALTER TABLE mri_scans ADD COLUMN preferred_doctor_id INTEGER;"
+            ]:
+                try:
+                    conn.execute(text(sql))
+                    conn.commit()
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
     create_sample_mri_images()
     db = SessionLocal()
 
@@ -76,12 +93,17 @@ def seed_database():
         u_smith = db.query(User).filter(func.lower(User.email) == "dr.smith@neurodetect.ai").first()
         u_robert = db.query(User).filter(func.lower(User.email) == "dr.robert@neurodetect.ai").first()
 
-        # If u_robert exists, delete it to free up its registration number MED-MGH-12345
+        # If u_robert exists, safely delete to free up its registration number MED-MGH-12345
         if u_robert:
-            if u_robert.doctor_profile:
-                db.delete(u_robert.doctor_profile)
-            db.delete(u_robert)
-            db.commit()
+            try:
+                if u_robert.doctor_profile:
+                    db.query(DoctorApproval).filter(DoctorApproval.doctor_id == u_robert.doctor_profile.id).delete()
+                    db.query(Appointment).filter(Appointment.doctor_id == u_robert.doctor_profile.id).delete()
+                    db.delete(u_robert.doctor_profile)
+                db.delete(u_robert)
+                db.commit()
+            except Exception:
+                db.rollback()
 
         # If u_rajesh currently has Doctor Robert Smith (from prior merge) and u_smith is missing:
         if u_rajesh and not u_smith and u_rajesh.doctor_profile and "Robert" in (u_rajesh.doctor_profile.name or ""):
